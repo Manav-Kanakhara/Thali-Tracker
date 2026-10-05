@@ -1040,6 +1040,18 @@ document.addEventListener('change',function(ev){
   if(ev.target.id==='rsort'){state.rsort=ev.target.value;fillRecipes();}
 });
 
+/* ---------- roll over to the new day at midnight, even if the app stays open ---------- */
+function checkDay(){
+  var now=ds(new Date());
+  if(now===TODAY)return;
+  var wasToday=state.date===TODAY;
+  TODAY=now;if(wasToday)state.date=now;
+  state.meal=autoMeal();show(state.tab);
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden)checkDay();});
+window.addEventListener('focus',checkDay);
+setInterval(checkDay,30000);
+
 /* ---------- boot ---------- */
 renderTabs();renderMini();viewFoods();setStatus();
 store.init().then(function(){
