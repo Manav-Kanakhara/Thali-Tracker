@@ -1,0 +1,16 @@
+{
+  "name": "Thali Tracker",
+  "short_name": "Thali",
+  "description": "Vegetarian food log, recipes and weight tracker",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F6F1",
+  "theme_color": "#1D6B4A",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

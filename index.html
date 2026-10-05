@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1D6B4A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Thali">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Thali Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: sticky running totals + tabs on top, food groups as dense tap-to-add lists below. Palette: green ink, spice orange for actions, one colour per nutrient. */
+:root{
+  --bg:#F3F6F1; --surface:#FFFFFF; --ink:#13241C; --muted:#586A60; --line:#DCE3DB; --soft:#E9EFE7;
+  --accent:#B8500F; --on-accent:#FFFFFF; --warn:#B3261E;
+  --p:#1D6B4A; --c:#8A6500; --f:#4457A0; --fb:#7B3F8F; --w:#17708F;
+  --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --body:'DM Sans','Segoe UI',system-ui,sans-serif;
+  --mono:'DM Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1613; --surface:#16211C; --ink:#E7EFE9; --muted:#98A99F; --line:#26352E; --soft:#1C2A24;
+    --accent:#F09A5E; --on-accent:#1B0E05; --warn:#FF8F85;
+    --p:#5CC49A; --c:#E0BE55; --f:#93A6EA; --fb:#CDA2E0; --w:#6CC0E6;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1613; --surface:#16211C; --ink:#E7EFE9; --muted:#98A99F; --line:#26352E; --soft:#1C2A24;
+  --accent:#F09A5E; --on-accent:#1B0E05; --warn:#FF8F85;
+  --p:#5CC49A; --c:#E0BE55; --f:#93A6EA; --fb:#CDA2E0; --w:#6CC0E6;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;padding-inline:16px}
+.wrap{max-width:880px;margin-inline:auto;padding-block:18px 96px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(26px,6vw,36px);line-height:1.05}
+h2{font-size:21px}
+h3{font-size:16px}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.top p{color:var(--muted);max-width:52ch;margin-top:6px}
+.pill{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--muted);background:var(--surface);white-space:nowrap}
+
+.sticky{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:8px 0;margin-inline:-16px;padding-inline:16px;border-bottom:1px solid var(--line)}
+.mini{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.m{min-width:0}
+.m-top{display:flex;flex-direction:column;line-height:1.15;margin-bottom:4px}
+.m-l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.m-v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;font-weight:500;white-space:nowrap}
+.m-v small{color:var(--muted);font-size:11px}
+.track{height:6px;border-radius:99px;background:var(--soft);overflow:hidden}
+.track i{display:block;height:100%;background:var(--col);border-radius:99px;transition:width .3s}
+.over .track i{background:var(--warn)}
+.tabs{display:flex;gap:4px;margin-top:8px}
+.tab{flex:1;border:0;background:transparent;padding:10px 4px;border-bottom:3px solid transparent;color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+
+.view{padding-top:16px}
+.ctl{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lab{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+input[type=search],input[type=number],input[type=date],select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0}
+input[type=search]{flex:1 1 200px}
+
+.grp{margin-bottom:22px}
+.grp header{margin-bottom:8px}
+.grp header p{color:var(--muted);font-size:13px;margin-top:2px;max-width:70ch}
+.food{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
+.fn{font-weight:700}
+.fs{font-size:13px;color:var(--muted)}
+.fm{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;margin-top:2px}
+.fm .k{color:var(--ink);font-weight:500}.fm .p{color:var(--p)}.fm .c{color:var(--c)}.fm .f{color:var(--f)}.fm .fb{color:var(--fb)}
+.add{grid-row:1/3;grid-column:2;width:40px;height:40px;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);font-size:22px;line-height:1;font-weight:700}
+.add:active{transform:scale(.94)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.datenav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.datenav b{font-family:var(--display);font-size:19px}
+.ib{border:1px solid var(--line);background:var(--surface);border-radius:10px;width:40px;height:40px;font-size:18px}
+.bigm{display:grid;gap:12px}
+.bigm .m-top{flex-direction:row;justify-content:space-between;align-items:baseline}
+.bigm .track{height:10px}
+.left{font-size:12px;color:var(--muted);margin-top:3px}
+.meal h3{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.meal h3 span{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+.ent{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.ent .fs{grid-column:1}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
+.qty b{min-width:30px;text-align:center;font-family:var(--mono);font-size:13px}
+.rm{border:0;background:transparent;color:var(--muted);width:30px;height:30px;font-size:18px}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.link{border:0;background:transparent;color:var(--accent);padding:0;text-decoration:underline;font-weight:500}
+.water{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.glasses{display:flex;gap:4px;flex-wrap:wrap}
+.gl{width:16px;height:22px;border-radius:3px 3px 6px 6px;border:1.5px solid var(--w);background:transparent}
+.gl.on{background:var(--w)}
+
+.btn{border:0;background:var(--accent);color:var(--on-accent);border-radius:10px;padding:10px 16px;font-weight:700}
+.btn.alt{background:var(--soft);color:var(--ink)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;align-items:end}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.svgwrap{width:100%}
+svg text{fill:var(--muted);font-family:var(--mono);font-size:9px}
+svg .ink{fill:var(--ink)}
+.cap{font-size:13px;color:var(--muted);margin-top:6px}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px 6px 0;white-space:nowrap}
+.tbl td{padding:9px 10px 9px 0;border-top:1px solid var(--line);vertical-align:top}
+.tbl td:first-child{font-weight:700;white-space:nowrap}
+.scroll{overflow-x:auto}
+.nut{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.nut .card{border-top:4px solid var(--col)}
+.nut .big{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--col)}
+.nut p{font-size:14px;margin-top:4px}
+.nut .src{color:var(--muted);font-size:13px}
+details.card summary{cursor:pointer;font-weight:700}
+.note{font-size:12.5px;color:var(--muted);margin-top:22px;max-width:75ch}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:calc(100vw - 32px);text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+/* recipes */
+.rcp{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;scroll-margin-top:140px}
+.rhead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;width:100%;text-align:left;background:transparent;border:0;padding:12px;border-radius:12px}
+.rtitle{display:flex;flex-direction:column;min-width:0}
+.rhead .fm{grid-column:1;grid-row:auto;margin-top:2px}
+.chev{grid-row:1/3;grid-column:2;width:32px;height:32px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-size:18px;align-self:center}
+.rbody{padding:12px;display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--line)}
+.steps{margin:6px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:6px;max-width:70ch}
+.tbl.ing td:first-child{white-space:normal;font-weight:500}
+.tbl.ing td:last-child{color:var(--muted)}
+.tipx{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px;max-width:70ch}
+@media (min-width:640px){
+  .m-top{flex-direction:row;justify-content:space-between;align-items:baseline}
+  .m-v{font-size:14px}
+  .food{grid-template-columns:minmax(0,1fr) auto auto;}
+  .fm{grid-column:auto;grid-row:1/3;grid-template-columns:none;margin-top:0}
+  .add{grid-column:3}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>html{-webkit-text-size-adjust:100%}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Thali Tracker</h1>
+      <p>Every food in grams, sorted by what it does for you, plus recipes with exact ingredient weights. Tap + to log it and watch your day fill up.</p>
+    </div>
+    <span class="pill" id="status">Loading</span>
+  </div>
+
+  <div class="sticky">
+    <div class="mini" id="mini"></div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button class="tab" role="tab" data-act="tab" data-v="foods">Foods</button>
+      <button class="tab" role="tab" data-act="tab" data-v="recipes">Recipes</button>
+      <button class="tab" role="tab" data-act="tab" data-v="today">Today</button>
+      <button class="tab" role="tab" data-act="tab" data-v="progress">Progress</button>
+      <button class="tab" role="tab" data-act="tab" data-v="guide">Guide</button>
+    </div>
+  </div>
+
+  <main class="view" id="view"></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- ingredient database: per 100 g edible portion [name, kcal, protein, carbs, fat, fibre] ---------- */
+/* Values follow USDA FoodData Central and IFCT 2017 (India) for the raw or dry ingredient. */
+var DB={
+oats:['Rolled oats, dry',379,13.2,67.7,6.5,10.1],
+besan:['Besan (chickpea flour)',387,22.4,57.8,6.7,10.8],
+rice:['White rice, raw',365,7.1,80,0.7,1.3],
+brownrice:['Brown rice, raw',370,7.9,77.2,2.9,3.5],
+quinoa:['Quinoa, raw',368,14.1,64.2,6.1,7],
+dalia:['Dalia (broken wheat), raw',342,12.3,75.9,1.3,12.5],
+poha:['Poha (flattened rice), raw',346,6.6,77.3,1.2,1.2],
+rava:['Rava (semolina), raw',360,12.7,72.8,1.1,3.9],
+ragi:['Ragi flour',328,7.3,72,1.3,11.5],
+jowar:['Jowar flour',349,10.4,72.6,1.9,9.7],
+atta:['Whole wheat atta',340,13.2,72,2.5,10.7],
+sweetpotato:['Sweet potato, raw',86,1.6,20.1,0.1,3],
+potato:['Potato, raw',77,2,17.5,0.1,2.2],
+corn:['Sweet corn kernels',86,3.3,19,1.4,2.7],
+murmura:['Puffed rice (murmura)',402,6.3,88.8,0.6,1.3],
+bread:['Whole wheat bread',252,12.4,42.7,3.5,6],
+cornflour:['Cornflour',381,0.3,91.3,0.1,0.9],
+moongdal:['Moong dal (yellow, split), raw',348,24,60,1.2,4.1],
+moong:['Moong (whole green), raw',347,23.9,62.6,1.2,16.3],
+toor:['Tuver (toor) dal, raw',343,21.7,62.8,1.5,15],
+masoor:['Masoor dal, raw',352,24.6,63.4,1.1,10.7],
+chana:['Chickpeas (kabuli or kala chana), raw',378,20.5,63,6,12.2],
+chanadal:['Chana dal, raw',372,21,60,5.3,10],
+rajma:['Rajma, raw',333,23.6,60,0.8,24.9],
+urad:['Urad dal, raw',341,25.2,58.9,1.6,18.3],
+lobia:['Lobia (chora), raw',336,23.5,60,1.3,10.6],
+soya:['Soya chunks, dry',345,52,33,0.5,13],
+peas:['Green peas, fresh or frozen',81,5.4,14.5,0.4,5.7],
+sprmoong:['Sprouted moong',105,7,19,0.5,3.5],
+sattu:['Sattu (roasted gram flour)',367,22,60,5,18],
+roastchana:['Roasted chana dal',372,22,58,5.5,15],
+egg:['Egg, whole',143,12.6,0.7,9.5,0],
+eggwhite:['Egg white',52,10.9,0.7,0.2,0],
+milk:['Cow milk, whole',62,3.2,4.8,3.4,0],
+curd:['Curd (dahi), whole milk',61,3.5,4.7,3.3,0],
+hungcurd:['Hung curd',97,9,3.9,5,0],
+paneer:['Paneer, full fat',265,18.3,1.2,20.8,0],
+tofu:['Firm tofu',144,17.3,2.8,8.7,2.3],
+ghee:['Ghee',876,0,0,99.5,0],
+butter:['Butter',717,0.9,0.1,81.1,0],
+oil:['Cooking oil (groundnut or sunflower)',884,0,0,100,0],
+olive:['Olive oil',884,0,0,100,0],
+onion:['Onion',40,1.1,9.3,0.1,1.7],
+tomato:['Tomato',18,0.9,3.9,0.2,1.2],
+spinach:['Palak (spinach)',23,2.9,3.6,0.4,2.2],
+methi:['Methi leaves',49,4.4,6,0.9,1.1],
+bhindi:['Bhindi (okra)',33,1.9,7.5,0.2,3.2],
+doodhi:['Doodhi (bottle gourd)',14,0.6,3.4,0.1,0.5],
+brinjal:['Ringan (brinjal)',25,1,5.9,0.2,3],
+cabbage:['Cabbage',25,1.3,5.8,0.1,2.5],
+cauli:['Cauliflower',25,1.9,5,0.3,2],
+broccoli:['Broccoli',34,2.8,6.6,0.4,2.6],
+capsicum:['Capsicum (green)',20,0.9,4.6,0.2,1.7],
+bellpep:['Bell pepper (red or yellow)',26,1,6,0.3,2.1],
+carrot:['Carrot',41,0.9,9.6,0.2,2.8],
+cucumber:['Cucumber',15,0.7,3.6,0.1,0.5],
+beans:['French beans (fansi)',31,1.8,7,0.2,3.4],
+beet:['Beetroot',43,1.6,9.6,0.2,2.8],
+mushroom:['Button mushrooms',22,3.1,3.3,0.3,1],
+zucchini:['Zucchini',17,1.2,3.1,0.3,1],
+pumpkin:['Pumpkin (kaddu)',26,1,6.5,0.1,0.5],
+karela:['Karela (bitter gourd)',17,1,3.7,0.2,2.8],
+lettuce:['Lettuce',17,1.2,3.3,0.3,2.1],
+avocado:['Avocado',160,2,8.5,14.7,6.7],
+chilli:['Green chilli',40,2,9.5,0.2,1.5],
+ginger:['Ginger',80,1.8,17.8,0.8,2],
+garlic:['Garlic',149,6.4,33,0.5,2.1],
+coriander:['Coriander leaves',23,2.1,3.7,0.5,2.8],
+mint:['Mint leaves',44,3.3,8.4,0.7,6.8],
+curryleaf:['Curry leaves',108,6.1,18.7,1,6.4],
+lemon:['Lemon juice',22,0.4,6.9,0.2,0.3],
+banana:['Banana',89,1.1,22.8,0.3,2.6],
+apple:['Apple',52,0.3,13.8,0.2,2.4],
+papaya:['Papaya',43,0.5,10.8,0.3,1.7],
+guava:['Guava',68,2.6,14.3,1,5.4],
+orange:['Orange',47,0.9,11.8,0.1,2.4],
+pomegranate:['Pomegranate seeds',83,1.7,18.7,1.2,4],
+amla:['Amla',44,0.9,10.2,0.6,4.3],
+watermelon:['Watermelon',30,0.6,7.6,0.2,0.4],
+mango:['Mango',60,0.8,15,0.4,1.6],
+blueberry:['Blueberries',57,0.7,14.5,0.3,2.4],
+strawberry:['Strawberries',32,0.7,7.7,0.3,2],
+kiwi:['Kiwi',61,1.1,14.7,0.5,3],
+pineapple:['Pineapple',50,0.5,13.1,0.1,1.4],
+muskmelon:['Muskmelon',34,0.8,8.2,0.2,0.9],
+chikoo:['Chikoo (sapota)',83,0.4,20,1.1,5.3],
+grapes:['Grapes',69,0.7,18.1,0.2,0.9],
+pear:['Pear',57,0.4,15.2,0.1,3.1],
+dates:['Dates',277,1.8,75,0.2,6.7],
+raisins:['Raisins',299,3.1,79.2,0.5,3.7],
+almond:['Almonds',579,21.2,21.6,49.9,12.5],
+walnut:['Walnuts',654,15.2,13.7,65.2,6.7],
+cashew:['Cashews',553,18.2,30.2,43.8,3.3],
+peanut:['Peanuts',567,25.8,16.1,49.2,8.5],
+pbutter:['Peanut butter, unsweetened',588,25,20,50,6],
+pumpkinseed:['Pumpkin seeds',559,30.2,10.7,49,6],
+sunflower:['Sunflower seeds',584,20.8,20,51.5,8.6],
+chia:['Chia seeds',486,16.5,42.1,30.7,34.4],
+flax:['Flax seeds',534,18.3,28.9,42.2,27.3],
+sesame:['Sesame seeds (til)',573,17.7,23.5,49.7,11.8],
+makhana:['Makhana',347,9.7,76.9,0.1,7],
+coconut:['Fresh coconut, grated',354,3.3,15.2,33.5,9],
+jaggery:['Jaggery',383,0.4,98,0.1,0],
+sugar:['Sugar',387,0,100,0,0],
+honey:['Honey',304,0.3,82.4,0,0.2],
+turmeric:['Turmeric powder',312,9.7,67.1,3.3,22.7],
+cumin:['Cumin (jeera)',375,17.8,44.2,22.3,10.5],
+corianderp:['Coriander powder',298,12.4,55,17.8,41.9],
+chillip:['Red chilli powder',282,12,54,14,35],
+spicemix:['Spice mix (garam, chaat, tandoori or sambar masala)',340,12,56,13,25],
+mustard:['Mustard seeds (rai)',508,26.1,28.1,36.2,12.2],
+hing:['Hing',297,4,67.8,1.1,4.1],
+pepper:['Black pepper',251,10.4,64,3.3,25.3],
+methiseed:['Methi seeds',323,23,58.4,6.4,24.6],
+cinnamon:['Cinnamon',247,4,80.6,1.2,53.1],
+tamarind:['Tamarind pulp',239,2.8,62.5,0.6,5.1],
+soy:['Soy sauce',53,8.1,4.9,0.6,0.8],
+salt:['Salt',0,0,0,0,0],
+eno:['Eno or baking soda',0,0,0,0,0],
+water:['Water',0,0,0,0,0]
+};
+
+function calc(ings,div){
+  var t={k:0,p:0,c:0,f:0,fb:0};div=div||1;
+  ings.forEach(function(x){var d=DB[x[0]];if(!d)throw new Error('Unknown ingredient '+x[0]);var m=x[1]/100;
+    t.k+=d[1]*m;t.p+=d[2]*m;t.c+=d[3]*m;t.f+=d[4]*m;t.fb+=d[5]*m;});
+  for(var k in t)t[k]=t[k]/div;
+  return t;
+}
+
+/* ---------- recipes: ingredient grams are raw or dry weight for the whole batch ---------- */
+var RECIPES=[
+{n:'Masala omelette',cu:'Indian',cat:'Breakfast',t:10,sv:1,ing:[['egg',150,'3 large eggs'],['eggwhite',66,'2 egg whites'],['onion',30,'finely chopped'],['tomato',30,'finely chopped'],['chilli',3,'1 small, chopped'],['coriander',5,'chopped'],['oil',5,'1 tsp'],['turmeric',0.5,'a pinch'],['salt',1,'to taste']],
+st:['Whisk the eggs, egg whites, turmeric and salt for 30 seconds until frothy.','Stir in the onion, tomato, chilli and coriander.','Heat the oil in a non-stick pan on medium heat and pour in the mix.','Cook 2 minutes until the base sets, flip, and cook 1 minute more.'],tip:'Add a handful of chopped spinach to the mix for extra iron and fibre.'},
+{n:'Egg bhurji',cu:'Indian',cat:'Breakfast',t:12,sv:1,ing:[['egg',150,'3 large eggs'],['onion',40,'chopped'],['tomato',50,'chopped'],['capsicum',30,'chopped'],['chilli',3,'chopped'],['oil',5,'1 tsp'],['cumin',1,'1/2 tsp'],['turmeric',0.5,'a pinch'],['spicemix',1,'pinch of garam masala'],['coriander',5,'chopped'],['salt',1,'to taste']],
+st:['Heat the oil and let the cumin crackle.','Saute onion and chilli for 2 minutes until soft.','Add capsicum, tomato, turmeric and salt. Cook 3 minutes until the tomato breaks down.','Turn the heat to low, pour in the beaten eggs and stir continuously for about 2 minutes until softly set.','Finish with garam masala and coriander.'],tip:'Take it off the heat while it still looks slightly wet. It keeps cooking on the plate.'},
+{n:'Paneer-stuffed besan pudla',cu:'Gujarati',cat:'Breakfast',t:15,sv:1,ing:[['besan',50,'about 6 tbsp'],['water',70,'for the batter'],['paneer',50,'grated'],['onion',25,'finely chopped'],['tomato',20,'finely chopped'],['coriander',8,'chopped'],['chilli',2,'chopped'],['cumin',1,'1/2 tsp'],['turmeric',0.5,'a pinch'],['oil',5,'1 tsp'],['salt',1,'to taste']],
+st:['Whisk besan, water, turmeric, cumin and salt into a smooth batter, like thin dosa batter. Rest 5 minutes.','Stir in onion, tomato, chilli and half the coriander.','Heat a non-stick tawa on medium. Spread half the batter into a 15 cm round and drizzle 1/2 tsp oil around the edge.','Cook 2 minutes, flip, cook 1 to 2 minutes more.','Spread half the paneer and coriander on top, fold, and repeat with the rest of the batter.'],tip:'Serve with mint chutney or 100 g curd.'},
+{n:'Moong dal cheela with paneer',cu:'Indian',cat:'Breakfast',t:20,sv:1,ing:[['moongdal',60,'soaked 2 hours, drained'],['paneer',40,'crumbled'],['onion',25,'finely chopped'],['ginger',3,'small piece'],['chilli',3,'1 small'],['coriander',5,'chopped'],['cumin',1,'1/2 tsp'],['oil',5,'1 tsp'],['salt',1,'to taste']],
+st:['Grind the soaked dal with ginger, chilli and about 60 ml water into a smooth, pourable batter.','Mix in cumin, salt and half the onion and coriander.','Spread a ladle of batter thin on a hot non-stick tawa and drizzle a few drops of oil.','Cook 2 minutes until golden, flip and cook 1 minute.','Fill with paneer and the remaining onion and coriander, fold, and make the second cheela the same way.'],tip:'Soak the dal the night before so breakfast takes 10 minutes.'},
+{n:'Masala oats with 2 boiled eggs',cu:'Indian',cat:'Breakfast',t:15,sv:1,ing:[['oats',45,'rolled'],['carrot',30,'diced'],['peas',30,''],['onion',30,'chopped'],['tomato',30,'chopped'],['oil',5,'1 tsp'],['cumin',1,'1/2 tsp'],['turmeric',0.5,'a pinch'],['chillip',0.5,'a pinch'],['water',200,'about 1 cup'],['egg',100,'2 large eggs, boiled'],['coriander',5,'chopped'],['salt',1,'to taste']],
+st:['Boil the eggs for 9 minutes, then cool in cold water.','Heat oil, add cumin, then onion. Cook 2 minutes.','Add carrot, peas, tomato, turmeric, chilli and salt. Cook 3 minutes.','Add oats and water, stir and simmer 3 to 4 minutes until creamy.','Top with coriander and serve with the sliced eggs.'],tip:'Add more water for a porridge texture, less for an upma style.'},
+{n:'Vegetable poha with peanuts',cu:'Gujarati',cat:'Breakfast',t:15,sv:1,ing:[['poha',60,'thick poha'],['onion',40,'chopped'],['peas',30,''],['carrot',30,'diced small'],['peanut',15,'raw'],['oil',5,'1 tsp'],['mustard',1,'1/4 tsp'],['curryleaf',1,'6 to 8 leaves'],['chilli',3,'chopped'],['turmeric',0.5,'a pinch'],['lemon',10,'2 tsp juice'],['coriander',5,'chopped'],['salt',1,'to taste'],['sugar',2,'optional, 1/2 tsp']],
+st:['Rinse the poha in a strainer for 20 seconds and let it soften for 5 minutes.','Heat oil, roast the peanuts 1 minute, then add mustard, curry leaves and chilli.','Add onion, carrot and peas and cook 4 minutes.','Add turmeric, salt and the poha. Mix gently and steam covered for 2 minutes on low.','Finish with lemon juice and coriander.'],tip:'Protein is low on its own. Eat it with 2 boiled eggs or 100 g curd.'},
+{n:'Moong dal khichdi',cu:'Gujarati',cat:'Main',t:30,sv:2,ing:[['rice',60,'washed'],['moongdal',70,'washed'],['carrot',60,'diced'],['peas',50,''],['ghee',8,'about 2 tsp'],['cumin',2,'1 tsp'],['hing',0.3,'a pinch'],['ginger',5,'grated'],['turmeric',1,'1/4 tsp'],['water',800,'about 3 1/4 cups'],['salt',3,'to taste']],
+st:['Soak rice and dal together for 20 minutes, then drain.','Heat ghee in a pressure cooker, add cumin, hing and ginger.','Add carrot and peas, then rice, dal, turmeric, salt and water.','Pressure cook for 4 whistles on medium, then let the pressure release on its own.','Stir well. Add hot water if you like it softer.'],tip:'Serve with kadhi or 100 g curd and a salad. One serving is about 350 g.'},
+{n:'Dal dhokli',cu:'Gujarati',cat:'Main',t:45,sv:2,ing:[['toor',70,'washed'],['atta',60,'for dhokli'],['oil',10,'3 g in dough, 7 g in tadka'],['peanut',10,''],['tomato',80,'chopped'],['jaggery',8,'reduce if you can'],['lemon',15,'1 tbsp juice'],['turmeric',1.5,'divided'],['chillip',1,'1/4 tsp'],['mustard',1,'1/4 tsp'],['cumin',1,'1/4 tsp'],['hing',0.3,'a pinch'],['curryleaf',1,'a sprig'],['coriander',10,'chopped'],['water',700,'for the dal'],['salt',3,'to taste']],
+st:['Pressure cook the dal with 300 ml water and a pinch of turmeric for 4 whistles. Whisk smooth.','Knead atta with 3 g oil, a pinch each of turmeric, chilli powder and salt, and water into a firm dough. Rest 10 minutes.','Heat 7 g oil, add mustard, cumin, hing and curry leaves, then peanuts and tomato. Cook 3 minutes.','Add the dal, remaining water, jaggery, lemon, chilli powder and salt. Bring to a rolling boil.','Roll the dough thin, cut into diamonds and drop them into the boiling dal one by one. Simmer 12 to 15 minutes, stirring now and then.','Finish with coriander.'],tip:'This is a full meal in one bowl. Add a salad on the side for fibre.'},
+{n:'Light Gujarati kadhi',cu:'Gujarati',cat:'Main',t:20,sv:2,ing:[['curd',150,'slightly sour'],['besan',20,'2 tbsp'],['water',400,''],['ghee',5,'1 tsp'],['jaggery',4,'1 tsp'],['ginger',3,'grated'],['chilli',2,'slit'],['mustard',1,'1/4 tsp'],['cumin',1,'1/4 tsp'],['methiseed',0.5,'a few seeds'],['curryleaf',1,'a sprig'],['turmeric',0.5,'a pinch'],['coriander',5,'chopped'],['salt',2,'to taste']],
+st:['Whisk curd, besan and water until there are no lumps.','Add ginger, chilli, jaggery and salt and bring to a boil on medium, stirring so it does not split.','Simmer 8 to 10 minutes until it thickens slightly.','In a small pan heat ghee, add mustard, cumin, methi seeds and curry leaves. Pour this tadka into the kadhi.','Finish with coriander.'],tip:'Pairs with khichdi. Skip the jaggery after a few weeks once your taste adjusts.'},
+{n:'Khaman',cu:'Gujarati',cat:'Snack',t:30,sv:2,ing:[['besan',100,'1 cup'],['water',180,'130 ml batter, 50 ml tempering'],['lemon',15,'1 tbsp juice'],['sugar',8,'4 g batter, 4 g tempering'],['eno',5,'1 tsp'],['turmeric',0.5,'a pinch'],['oil',8,'tempering'],['mustard',1,'1/4 tsp'],['sesame',3,'1 tsp'],['chilli',4,'slit'],['curryleaf',1,'a sprig'],['coriander',10,'chopped'],['coconut',10,'grated, optional'],['salt',2,'to taste']],
+st:['Whisk besan, 130 ml water, lemon juice, 4 g sugar, turmeric and salt into a smooth batter. Rest 10 minutes.','Grease a tin and bring water to a boil in a steamer.','Stir the Eno into the batter, mix quickly, pour into the tin and steam 15 minutes on high. Rest 5 minutes and cut.','Heat oil, add mustard, sesame, chilli and curry leaves. Add 50 ml water and 4 g sugar and pour over the khaman.','Top with coriander and coconut.'],tip:'About 6 pieces per serving. Good as a protein-rich evening snack.'},
+{n:'Steamed doodhi muthia',cu:'Gujarati',cat:'Snack',t:40,sv:2,ing:[['doodhi',250,'grated, not squeezed'],['besan',40,''],['jowar',40,'or atta'],['oil',10,'3 g dough, 7 g tempering'],['sesame',6,'2 tsp'],['ginger',5,'grated'],['chilli',4,'crushed'],['turmeric',1,'1/4 tsp'],['lemon',10,'2 tsp juice'],['jaggery',3,'optional'],['mustard',1,'1/4 tsp'],['coriander',10,'chopped'],['salt',2,'to taste']],
+st:['Mix doodhi, ginger, chilli, turmeric, lemon, jaggery, salt and 3 g oil. Add besan and jowar to make a soft dough using the doodhi water only.','Shape into 3 to 4 logs about 3 cm thick.','Steam 20 to 25 minutes until a knife comes out clean. Cool 10 minutes and slice.','Heat 7 g oil, add mustard and sesame, add the slices and toss 3 minutes until lightly crisp.','Finish with coriander.'],tip:'Steamed and tempered muthia has a fraction of the oil of fried muthia.'},
+{n:'Handvo (baked lentil cake)',cu:'Gujarati',cat:'Main',t:60,sv:4,ing:[['rice',60,'soaked 4 hours'],['toor',40,'soaked 4 hours'],['chanadal',20,'soaked 4 hours'],['urad',20,'soaked 4 hours'],['curd',80,''],['doodhi',250,'grated'],['ginger',8,'grated'],['chilli',5,'crushed'],['turmeric',1,'1/4 tsp'],['sugar',4,'1 tsp'],['lemon',10,'2 tsp juice'],['oil',18,'5 g batter, 13 g pan and tempering'],['mustard',1,'1/2 tsp'],['sesame',8,'1 tbsp'],['eno',3,'or 1/2 tsp baking soda'],['coriander',10,'chopped'],['salt',4,'to taste']],
+st:['Grind the soaked rice and dals with the curd into a coarse batter. Ferment 6 to 8 hours.','Mix in doodhi, ginger, chilli, turmeric, sugar, lemon, salt and 5 g oil.','Heat 13 g oil in a heavy pan, add mustard and sesame, let them crackle.','Stir Eno into the batter and pour it into the pan. Cover and cook on low for 20 minutes.','Flip carefully, cook 10 to 15 minutes more until both sides are golden. Cut into 4.'],tip:'One quarter of the pan is one serving. Eat with curd for more protein.'},
+{n:'Mag nu shaak (whole moong)',cu:'Gujarati',cat:'Main',t:35,sv:2,ing:[['moong',80,'soaked 6 hours'],['onion',50,'chopped'],['tomato',100,'chopped'],['ginger',3,'grated'],['garlic',4,'2 cloves'],['oil',10,'2 tsp'],['mustard',1,'1/4 tsp'],['cumin',1,'1/4 tsp'],['curryleaf',1,'a sprig'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['spicemix',1,'garam masala'],['jaggery',3,'optional'],['lemon',10,'2 tsp juice'],['coriander',10,'chopped'],['water',300,''],['salt',3,'to taste']],
+st:['Pressure cook the soaked moong with 300 ml water and salt for 3 whistles. The beans should be soft but whole.','Heat oil, add mustard, cumin and curry leaves, then onion, ginger and garlic. Cook 4 minutes.','Add tomato, turmeric and chilli powder. Cook 4 minutes until soft.','Add the moong with its water, jaggery and garam masala. Simmer 5 minutes.','Finish with lemon and coriander.'],tip:'Eat with 1 cup rice or millet for a complete meal.'},
+{n:'Bhindi shaak',cu:'Gujarati',cat:'Main',t:25,sv:2,ing:[['bhindi',300,'washed, dried, sliced'],['onion',50,'sliced'],['oil',10,'2 tsp'],['besan',10,'1 tbsp, roasted'],['mustard',1,'1/4 tsp'],['cumin',1,'1/4 tsp'],['turmeric',1,'1/4 tsp'],['corianderp',2,'1 tsp'],['chillip',1,'1/4 tsp'],['lemon',5,'1 tsp juice'],['salt',2,'to taste']],
+st:['Dry the bhindi completely before cutting so it does not turn slimy.','Heat oil, add mustard and cumin, then the onion. Cook 2 minutes.','Add bhindi and cook uncovered on medium for 10 to 12 minutes, stirring now and then.','Add turmeric, coriander powder, chilli powder, salt and the roasted besan. Toss 2 minutes.','Finish with lemon juice.'],tip:'Add salt only at the end. Salt early makes bhindi sticky.'},
+{n:'Ringan nu bharthu',cu:'Gujarati',cat:'Main',t:35,sv:2,ing:[['brinjal',500,'1 large'],['onion',80,'chopped'],['tomato',100,'chopped'],['garlic',10,'5 cloves'],['chilli',5,'chopped'],['oil',12,'about 2 1/2 tsp'],['cumin',1,'1/4 tsp'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['coriander',10,'chopped'],['salt',2,'to taste']],
+st:['Brush the brinjal with a few drops of oil and roast directly on the gas flame for 10 to 12 minutes, turning, until fully soft.','Cool, peel and mash the flesh.','Heat oil, add cumin, then garlic, chilli and onion. Cook 4 minutes.','Add tomato, turmeric and chilli powder and cook 4 minutes until soft.','Add the brinjal and salt and cook 5 minutes. Finish with coriander.'],tip:'Smoky and filling for very few calories. Pair with a dal or paneer for protein.'},
+{n:'Doodhi chana dal shaak',cu:'Gujarati',cat:'Main',t:30,sv:2,ing:[['doodhi',350,'peeled, cubed'],['chanadal',40,'soaked 1 hour'],['tomato',80,'chopped'],['oil',10,'2 tsp'],['mustard',1,'1/4 tsp'],['cumin',1,'1/4 tsp'],['curryleaf',1,'a sprig'],['ginger',4,'grated'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['corianderp',2,'1 tsp'],['jaggery',3,'optional'],['lemon',5,'1 tsp juice'],['coriander',10,'chopped'],['water',200,''],['salt',2,'to taste']],
+st:['Heat oil in a pressure cooker, add mustard, cumin and curry leaves, then ginger and tomato. Cook 3 minutes.','Add spices, soaked chana dal and 200 ml water. Pressure cook 1 whistle.','Add doodhi and salt and pressure cook 1 more whistle.','Add jaggery and lemon and simmer 2 minutes. Finish with coriander.'],tip:'The chana dal adds protein and keeps the doodhi from feeling too light.'},
+{n:'Gujarati tuver dal',cu:'Gujarati',cat:'Main',t:35,sv:2,ing:[['toor',70,'washed'],['tomato',80,'chopped'],['peanut',10,''],['ghee',8,'about 2 tsp'],['jaggery',6,'reduce over time'],['lemon',15,'1 tbsp juice'],['ginger',4,'grated'],['chilli',3,'slit'],['mustard',1,'1/4 tsp'],['cumin',1,'1/4 tsp'],['methiseed',0.5,'a few seeds'],['hing',0.3,'a pinch'],['curryleaf',2,'a sprig'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['coriander',10,'chopped'],['water',700,''],['salt',3,'to taste']],
+st:['Pressure cook the dal and peanuts with 300 ml water and turmeric for 4 whistles. Whisk smooth.','Add the remaining water, tomato, ginger, chilli, jaggery, lemon, chilli powder and salt. Boil 8 minutes.','Heat ghee, add mustard, cumin, methi seeds, hing and curry leaves. Pour into the dal.','Simmer 2 minutes and finish with coriander.'],tip:'One serving is about 1 1/2 katoris. Eat with 1 cup rice and a sabzi.'},
+{n:'Palak paneer',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['paneer',150,'cubed'],['spinach',300,'washed'],['onion',80,'chopped'],['tomato',80,'chopped'],['garlic',8,'4 cloves'],['ginger',6,'grated'],['chilli',3,''],['oil',10,'2 tsp'],['cumin',1,'1/2 tsp'],['turmeric',1,'1/4 tsp'],['spicemix',2,'garam masala'],['milk',50,'instead of cream'],['salt',2,'to taste']],
+st:['Blanch spinach 2 minutes in boiling water, then put it in cold water. Blend with the chilli into a smooth puree.','Heat oil, add cumin, then onion, garlic and ginger. Cook 5 minutes.','Add tomato and turmeric and cook 4 minutes until soft.','Add the spinach puree and salt and simmer 5 minutes.','Stir in milk, garam masala and paneer. Simmer 2 minutes.'],tip:'Blanching only 2 minutes keeps the green colour and the vitamins.'},
+{n:'Paneer bhurji',cu:'Indian',cat:'Main',t:15,sv:1,ing:[['paneer',120,'crumbled'],['onion',40,'chopped'],['tomato',60,'chopped'],['capsicum',30,'chopped'],['chilli',3,'chopped'],['oil',5,'1 tsp'],['cumin',1,'1/2 tsp'],['turmeric',0.5,'a pinch'],['spicemix',1,'pinch of garam masala'],['coriander',5,'chopped'],['salt',1,'to taste']],
+st:['Heat oil and crackle the cumin.','Saute onion and chilli for 2 minutes.','Add capsicum, tomato, turmeric and salt and cook 3 minutes.','Add paneer and garam masala and toss 2 minutes. Do not overcook or it turns rubbery.','Finish with coriander.'],tip:'Use paneer from skimmed milk to cut the fat if you need a lighter version.'},
+{n:'Paneer tikka',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['paneer',200,'in 3 cm cubes'],['hungcurd',80,''],['capsicum',80,'in squares'],['onion',60,'in squares'],['ginger',5,'paste'],['garlic',5,'paste'],['lemon',10,'2 tsp juice'],['spicemix',5,'tandoori masala, 2 tsp'],['chillip',2,'1/2 tsp'],['oil',8,'for brushing'],['salt',2,'to taste']],
+st:['Mix hung curd, ginger, garlic, lemon, tandoori masala, chilli powder, salt and 4 g oil.','Coat paneer, capsicum and onion and marinate 20 minutes.','Thread on skewers or spread on a tray.','Air fry at 200 C for 10 to 12 minutes, or cook on a hot tawa with the remaining oil, turning, 8 to 10 minutes.'],tip:'Serve with mint chutney and a big salad.'},
+{n:'Tofu tikka',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['tofu',250,'pressed, cubed'],['hungcurd',100,''],['capsicum',80,'in squares'],['onion',60,'in squares'],['ginger',5,'paste'],['garlic',5,'paste'],['lemon',10,'2 tsp juice'],['spicemix',5,'tandoori masala'],['chillip',2,'1/2 tsp'],['oil',8,'for brushing'],['salt',2,'to taste']],
+st:['Press the tofu between kitchen towels under a weight for 15 minutes to remove water.','Mix hung curd, ginger, garlic, lemon, spices, salt and 4 g oil.','Coat tofu and vegetables and marinate 20 minutes.','Air fry at 200 C for 12 to 14 minutes or cook on a hot tawa with the remaining oil until charred at the edges.'],tip:'Same flavour as paneer tikka with less fat and more protein per calorie.'},
+{n:'Soya chunk curry',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['soya',60,'dry'],['onion',100,'chopped'],['tomato',150,'pureed'],['curd',50,'whisked'],['garlic',8,'4 cloves'],['ginger',8,'grated'],['oil',12,'about 2 1/2 tsp'],['cumin',1,'1/2 tsp'],['turmeric',1,'1/4 tsp'],['chillip',2,'1/2 tsp'],['corianderp',3,'1 1/2 tsp'],['spicemix',3,'garam masala'],['coriander',10,'chopped'],['water',250,''],['salt',3,'to taste']],
+st:['Boil soya chunks in salted water for 5 minutes. Rinse in cold water and squeeze dry. Repeat once.','Heat oil, add cumin, then onion. Cook 6 minutes until golden.','Add ginger and garlic for 1 minute, then tomato puree and the powders. Cook 6 minutes until oil separates.','Lower the heat, stir in the curd, then add soya and 250 ml water. Simmer 8 minutes.','Finish with garam masala and coriander.'],tip:'Squeezing the chunks well removes the raw soya smell and lets them soak up masala.'},
+{n:'Soya pulao',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['rice',80,'basmati, soaked 20 min'],['soya',40,'dry'],['peas',60,''],['carrot',40,'diced'],['onion',60,'sliced'],['ginger',5,'grated'],['garlic',5,'chopped'],['oil',10,'2 tsp'],['cumin',2,'1 tsp'],['spicemix',2,'garam masala'],['turmeric',0.5,'a pinch'],['water',220,''],['salt',3,'to taste']],
+st:['Boil soya chunks 5 minutes, rinse, squeeze and halve them.','Heat oil, add cumin, then onion, ginger and garlic. Cook 4 minutes.','Add carrot, peas, soya, turmeric and garam masala. Cook 2 minutes.','Add drained rice, salt and water. Cover and cook on low for 12 minutes, or 2 whistles in a cooker.','Rest 5 minutes before fluffing.'],tip:'Serve with raita (100 g curd) for a complete plate.'},
+{n:'Rajma masala',cu:'Indian',cat:'Main',t:50,sv:2,ing:[['rajma',100,'soaked overnight'],['onion',120,'chopped'],['tomato',150,'pureed'],['garlic',8,'4 cloves'],['ginger',8,'grated'],['oil',12,'about 2 1/2 tsp'],['cumin',2,'1 tsp'],['turmeric',1,'1/4 tsp'],['chillip',2,'1/2 tsp'],['spicemix',3,'garam masala'],['coriander',10,'chopped'],['water',600,''],['salt',3,'to taste']],
+st:['Pressure cook soaked rajma with 600 ml water and salt for 6 to 7 whistles until completely soft.','Heat oil, add cumin, then onion. Cook 8 minutes until deep golden.','Add ginger, garlic, tomato and spices. Cook 8 minutes until thick.','Add rajma with its water and simmer 10 minutes. Mash a few beans to thicken.','Finish with coriander.'],tip:'Undercooked rajma causes stomach trouble. Always soak overnight and cook fully.'},
+{n:'Chole',cu:'Indian',cat:'Main',t:50,sv:2,ing:[['chana',100,'kabuli, soaked overnight'],['onion',100,'chopped'],['tomato',150,'pureed'],['garlic',8,'4 cloves'],['ginger',8,'grated'],['oil',12,'about 2 1/2 tsp'],['cumin',2,'1 tsp'],['turmeric',1,'1/4 tsp'],['chillip',2,'1/2 tsp'],['spicemix',4,'chole masala'],['lemon',10,'2 tsp juice'],['coriander',10,'chopped'],['water',600,''],['salt',3,'to taste']],
+st:['Pressure cook the chickpeas with 600 ml water and salt for 5 to 6 whistles.','Heat oil, add cumin, then onion. Cook 8 minutes until browned.','Add ginger, garlic, tomato and spices. Cook 8 minutes.','Add chickpeas with water and simmer 10 minutes, mashing a few for a thick gravy.','Finish with lemon and coriander.'],tip:'Skip the bhatura. Eat with 1 cup rice or millet and onion salad.'},
+{n:'Dal tadka (moong and masoor)',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['moongdal',35,'washed'],['masoor',35,'washed'],['onion',40,'chopped'],['tomato',80,'chopped'],['garlic',6,'3 cloves, sliced'],['ghee',8,'about 2 tsp'],['cumin',2,'1 tsp'],['hing',0.3,'a pinch'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['lemon',10,'2 tsp juice'],['coriander',10,'chopped'],['water',600,''],['salt',3,'to taste']],
+st:['Pressure cook both dals with 400 ml water and turmeric for 3 whistles. Whisk.','Heat half the ghee, cook onion 3 minutes, add tomato and cook 4 minutes. Add the dal and 200 ml water and simmer 5 minutes.','In a small pan heat the rest of the ghee, add cumin, hing, garlic and chilli powder until the garlic turns golden.','Pour the tadka over the dal and finish with lemon and coriander.'],tip:'Both dals cook fast, so this works on busy days.'},
+{n:'Palak moong dal',cu:'Indian',cat:'Main',t:30,sv:2,ing:[['moongdal',70,'washed'],['spinach',150,'chopped'],['tomato',60,'chopped'],['garlic',8,'4 cloves'],['ghee',8,'about 2 tsp'],['cumin',2,'1 tsp'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['lemon',10,'2 tsp juice'],['water',550,''],['salt',3,'to taste']],
+st:['Pressure cook dal with 400 ml water and turmeric for 3 whistles.','Heat ghee, add cumin and garlic until golden, then tomato. Cook 3 minutes.','Add spinach and cook 2 minutes until wilted.','Add the dal, 150 ml water, chilli powder and salt. Simmer 5 minutes and add lemon.'],tip:'Lemon with spinach and dal helps your body absorb the iron.'},
+{n:'Sambar',cu:'Indian',cat:'Main',t:45,sv:4,ing:[['toor',80,'washed'],['pumpkin',100,'cubed'],['carrot',80,'cubed'],['brinjal',100,'cubed'],['tomato',100,'chopped'],['onion',80,'small onions or sliced'],['tamarind',12,'soaked in 100 ml water'],['oil',10,'2 tsp'],['mustard',1,'1/2 tsp'],['curryleaf',2,'2 sprigs'],['hing',0.3,'a pinch'],['turmeric',1,'1/4 tsp'],['spicemix',8,'sambar powder, 1 tbsp'],['coriander',10,'chopped'],['water',900,''],['salt',5,'to taste']],
+st:['Pressure cook dal with 400 ml water and turmeric for 4 whistles. Mash.','Boil the vegetables and onion in 500 ml water with salt for 8 minutes.','Add tamarind water, sambar powder and the dal. Simmer 10 minutes.','Heat oil, add mustard, hing and curry leaves, and pour into the sambar. Add coriander.'],tip:'One serving is about 1 big bowl. Pair with idli for a classic, filling meal.'},
+{n:'Idli',cu:'Indian',cat:'Breakfast',t:30,sv:4,ing:[['rice',200,'idli rice, soaked 6 hours'],['urad',60,'soaked 6 hours'],['methiseed',1,'soaked with the dal'],['salt',4,'to taste']],
+st:['Grind urad dal and methi with cold water to a light, fluffy batter. Grind the rice separately to a slightly coarse batter.','Mix both with salt and ferment 8 to 12 hours in a warm place until doubled.','Grease idli plates, fill each mould three quarters full.','Steam 10 to 12 minutes. Rest 2 minutes before removing.'],tip:'Makes 16 idlis. One serving is 4 idlis. Eat with sambar for protein and fibre.'},
+{n:'Moong sprouts chaat',cu:'Indian',cat:'Snack',t:10,sv:1,ing:[['sprmoong',150,'lightly steamed or raw'],['tomato',50,'chopped'],['onion',30,'chopped'],['cucumber',50,'chopped'],['pomegranate',20,''],['chilli',2,'chopped'],['coriander',5,'chopped'],['lemon',10,'2 tsp juice'],['spicemix',2,'chaat masala'],['salt',1,'to taste']],
+st:['Steam the sprouts 3 minutes if you prefer them softer. Cool.','Mix everything in a bowl.','Add lemon, chaat masala and salt just before eating so it stays crunchy.'],tip:'To sprout: soak 80 g whole moong 8 hours, drain, and keep covered 12 to 24 hours.'},
+{n:'Roasted masala makhana',cu:'Indian',cat:'Snack',t:10,sv:1,ing:[['makhana',30,'about 1 1/2 cups'],['ghee',4,'1 tsp'],['spicemix',1,'chaat masala'],['pepper',0.5,'a pinch'],['salt',0.5,'a pinch']],
+st:['Dry roast makhana on low heat for 6 to 8 minutes, stirring, until one crushes with a crisp snap.','Add ghee and toss 1 minute.','Turn off the heat, add chaat masala, pepper and salt, and toss.'],tip:'Keeps crisp for a week in an airtight jar.'},
+{n:'Sattu drink',cu:'Indian',cat:'Drink',t:3,sv:1,ing:[['sattu',40,'4 tbsp'],['water',250,'chilled'],['lemon',15,'1 tbsp juice'],['cumin',1,'roasted, powdered'],['mint',2,'a few leaves'],['salt',1,'black salt']],
+st:['Whisk sattu into a little water to make a paste with no lumps.','Add the rest of the water, lemon, roasted cumin and black salt.','Stir well and add mint.'],tip:'A natural, cheap protein drink. Have it after the gym or as an evening snack.'},
+{n:'Hung curd berry bowl',cu:'Foreign',cat:'Breakfast',t:5,sv:1,ing:[['hungcurd',200,''],['blueberry',50,'or strawberries'],['almond',10,'about 8, chopped'],['chia',6,'2 tsp'],['honey',5,'1 tsp, optional'],['cinnamon',0.5,'a pinch']],
+st:['To make hung curd, strain about 400 g curd in a muslin cloth in the fridge for 4 hours.','Spoon into a bowl and top with berries, almonds, chia and cinnamon.','Drizzle the honey if using.'],tip:'Any seasonal fruit works: papaya, apple or pomegranate.'},
+{n:'Overnight oats with chia',cu:'Foreign',cat:'Breakfast',t:5,sv:1,ing:[['oats',40,'rolled'],['milk',150,'cow milk'],['hungcurd',50,''],['chia',8,'2 tsp'],['banana',60,'half, sliced'],['almond',8,'about 6'],['cinnamon',0.5,'a pinch']],
+st:['Mix oats, milk, hung curd, chia and cinnamon in a jar.','Cover and refrigerate overnight, at least 6 hours.','In the morning top with banana and chopped almonds.'],tip:'Make 3 jars at once to cover 3 mornings.'},
+{n:'Banana oat pancakes',cu:'Foreign',cat:'Breakfast',t:15,sv:1,ing:[['oats',40,'blended to flour'],['egg',100,'2 large eggs'],['banana',60,'ripe, half'],['cinnamon',0.5,'a pinch'],['oil',3,'for the pan']],
+st:['Blend oats, eggs, banana and cinnamon into a thick batter. Rest 5 minutes.','Heat a non-stick pan on medium-low and brush with oil.','Pour 3 small pancakes, cook 2 minutes until bubbles appear, flip, cook 1 minute.','Repeat with the rest of the batter.'],tip:'Top with 50 g hung curd and berries instead of syrup.'},
+{n:'Egg curry',cu:'Indian',cat:'Main',t:35,sv:2,ing:[['egg',300,'6 large eggs, boiled'],['onion',120,'chopped'],['tomato',150,'pureed'],['ginger',6,'grated'],['garlic',8,'4 cloves'],['oil',14,'about 3 tsp'],['cumin',1,'1/2 tsp'],['turmeric',1,'1/4 tsp'],['chillip',2,'1/2 tsp'],['corianderp',3,'1 1/2 tsp'],['spicemix',2,'garam masala'],['coriander',10,'chopped'],['water',200,''],['salt',3,'to taste']],
+st:['Boil the eggs 9 minutes, peel and make 2 small slits on each.','Heat oil, add cumin, then onion. Cook 7 minutes until golden.','Add ginger, garlic, tomato and powders. Cook 6 minutes until thick.','Add water and salt, simmer 5 minutes, then add eggs and simmer 5 minutes more.','Finish with garam masala and coriander.'],tip:'For more protein with less fat, use 4 whole eggs and 4 extra boiled whites.'},
+{n:'Chickpea and egg salad',cu:'Foreign',cat:'Salad',t:15,sv:1,ing:[['egg',100,'2 large eggs, boiled'],['chana',30,'dry, about 75 g boiled'],['cucumber',80,'diced'],['tomato',60,'diced'],['onion',30,'diced'],['lemon',15,'1 tbsp juice'],['olive',5,'1 tsp'],['coriander',5,'chopped'],['pepper',0.5,'crushed'],['salt',1,'to taste']],
+st:['Cook soaked chickpeas until soft (or use leftover boiled chana). Cool.','Chop the eggs and vegetables.','Whisk lemon, olive oil, salt and pepper and toss everything together.'],tip:'Pack it for lunch. It keeps well for a day in the fridge.'},
+{n:'Tofu bhurji',cu:'Indian',cat:'Breakfast',t:15,sv:1,ing:[['tofu',150,'crumbled'],['onion',40,'chopped'],['tomato',50,'chopped'],['capsicum',30,'chopped'],['chilli',2,'chopped'],['oil',5,'1 tsp'],['cumin',1,'1/2 tsp'],['turmeric',1,'1/4 tsp'],['spicemix',1,'pav bhaji or garam masala'],['coriander',5,'chopped'],['salt',1,'to taste']],
+st:['Squeeze excess water from the tofu and crumble it.','Heat oil, add cumin, then onion and chilli. Cook 2 minutes.','Add capsicum, tomato, turmeric and salt. Cook 3 minutes.','Add tofu and masala and cook 3 to 4 minutes until dry and fluffy.','Finish with coriander.'],tip:'Turmeric gives the same yellow look as egg bhurji.'},
+{n:'Quinoa vegetable pulao',cu:'Foreign',cat:'Main',t:30,sv:2,ing:[['quinoa',100,'rinsed well'],['peas',60,''],['carrot',60,'diced'],['beans',40,'chopped'],['onion',60,'sliced'],['ginger',5,'grated'],['oil',8,'about 2 tsp'],['cumin',2,'1 tsp'],['spicemix',2,'garam masala'],['coriander',10,'chopped'],['water',200,''],['salt',2,'to taste']],
+st:['Rinse quinoa in a fine strainer for 1 minute to remove bitterness.','Heat oil, add cumin, onion and ginger. Cook 3 minutes.','Add vegetables and garam masala and cook 3 minutes.','Add quinoa, salt and water. Cover and cook on low for 15 minutes.','Rest 5 minutes, fluff, and add coriander.'],tip:'Eat with 100 g paneer or tofu tikka to make it a high-protein plate.'},
+{n:'Vegetable dalia upma',cu:'Indian',cat:'Breakfast',t:25,sv:2,ing:[['dalia',80,'roasted 3 minutes'],['onion',50,'chopped'],['carrot',50,'diced'],['beans',40,'chopped'],['peas',40,''],['peanut',15,''],['oil',8,'about 2 tsp'],['mustard',1,'1/4 tsp'],['curryleaf',2,'a sprig'],['ginger',4,'grated'],['chilli',3,'chopped'],['lemon',10,'2 tsp juice'],['coriander',5,'chopped'],['water',350,''],['salt',2,'to taste']],
+st:['Dry roast dalia for 3 minutes and set aside.','Heat oil, roast peanuts, add mustard, curry leaves, ginger and chilli.','Add onion and vegetables and cook 4 minutes.','Add dalia, salt and hot water. Cover and cook on low 12 minutes, or 2 whistles in a cooker.','Finish with lemon and coriander.'],tip:'Dalia is high in fibre, so it keeps you full until lunch.'},
+{n:'Lauki soup',cu:'Indian',cat:'Soup',t:25,sv:2,ing:[['doodhi',300,'peeled, cubed'],['onion',40,'chopped'],['garlic',5,'2 cloves'],['ginger',5,'small piece'],['chilli',2,''],['oil',5,'1 tsp'],['pepper',1,'crushed'],['coriander',10,''],['water',400,''],['salt',2,'to taste']],
+st:['Heat oil and cook onion, garlic, ginger and chilli for 3 minutes.','Add doodhi and water and pressure cook 2 whistles.','Blend with coriander until smooth.','Reheat, season with salt and pepper.'],tip:'Very low in calories. Have it before dinner to fill up.'},
+{n:'Tofu and vegetable clear soup',cu:'Asian',cat:'Soup',t:20,sv:2,ing:[['tofu',100,'cubed'],['broccoli',80,'small florets'],['carrot',40,'sliced thin'],['mushroom',60,'sliced'],['cabbage',60,'shredded'],['garlic',5,'chopped'],['ginger',5,'chopped'],['soy',10,'2 tsp'],['oil',5,'1 tsp'],['cornflour',4,'mixed in 2 tbsp water'],['pepper',0.5,''],['coriander',5,''],['water',600,''],['salt',1,'to taste']],
+st:['Heat oil and cook garlic and ginger 1 minute.','Add carrot, mushroom and cabbage and cook 2 minutes.','Add water and soy sauce and bring to a boil. Add broccoli and tofu and simmer 4 minutes.','Stir in the cornflour slurry and simmer 1 minute until slightly thick.','Season with pepper and salt and add coriander.'],tip:'Soy sauce is salty, so taste before adding salt.'},
+{n:'Mediterranean chickpea paneer salad',cu:'Foreign',cat:'Salad',t:15,sv:2,ing:[['chana',60,'dry, about 150 g boiled'],['paneer',60,'cubed'],['cucumber',150,'diced'],['tomato',150,'diced'],['onion',40,'sliced'],['lettuce',50,'torn'],['mint',5,'chopped'],['olive',15,'1 tbsp'],['lemon',20,'juice of 1/2 lemon'],['pepper',1,'crushed'],['salt',1,'to taste']],
+st:['Boil soaked chickpeas until soft and cool them.','Whisk olive oil, lemon, salt, pepper and mint.','Toss chickpeas, paneer and vegetables with the dressing.'],tip:'Use paneer like feta. Crumble it for a creamier salad.'},
+{n:'Shakshuka',cu:'Foreign',cat:'Breakfast',t:25,sv:2,ing:[['egg',200,'4 large eggs'],['tomato',400,'chopped'],['bellpep',100,'chopped'],['onion',80,'chopped'],['garlic',8,'4 cloves'],['olive',10,'2 tsp'],['cumin',2,'1 tsp'],['chillip',2,'paprika or chilli powder'],['coriander',10,'chopped'],['salt',2,'to taste']],
+st:['Heat oil in a wide pan, cook onion and pepper 5 minutes.','Add garlic and spices for 1 minute, then tomato and salt. Simmer 10 minutes until thick.','Make 4 wells and crack an egg into each.','Cover and cook on low for 5 to 7 minutes until the whites set.','Top with coriander.'],tip:'Mop it up with a slice of whole wheat bread if you want carbs.'},
+{n:'Spinach mushroom egg muffins',cu:'Foreign',cat:'Breakfast',t:30,sv:2,ing:[['egg',250,'5 large eggs'],['spinach',60,'chopped'],['mushroom',100,'chopped'],['onion',40,'chopped'],['paneer',40,'crumbled'],['oil',5,'for greasing and sauteing'],['pepper',0.5,''],['salt',1,'to taste']],
+st:['Heat the oven or air fryer to 180 C. Grease 6 muffin moulds.','Saute mushroom and onion in a little oil for 4 minutes, add spinach until wilted.','Whisk eggs with salt and pepper, stir in vegetables and paneer.','Divide into the moulds and bake 18 to 20 minutes until set.'],tip:'Makes 6. Keeps 3 days in the fridge, so breakfast is ready in 1 minute.'},
+{n:'Tofu vegetable stir-fry',cu:'Asian',cat:'Main',t:20,sv:2,ing:[['tofu',200,'pressed, cubed'],['broccoli',150,'florets'],['bellpep',100,'sliced'],['carrot',80,'sliced'],['garlic',8,'chopped'],['ginger',8,'chopped'],['soy',20,'4 tsp'],['oil',10,'2 tsp'],['sesame',6,'2 tsp'],['pepper',0.5,'']],
+st:['Pan fry the tofu in half the oil on high for 6 minutes until golden. Set aside.','Add the rest of the oil, garlic and ginger, then all vegetables. Stir-fry 4 minutes on high.','Add tofu and soy sauce and toss 1 minute.','Finish with sesame and pepper.'],tip:'Eat with 1/2 cup brown rice or quinoa.'},
+{n:'Hummus with veggie sticks',cu:'Foreign',cat:'Snack',t:20,sv:4,ing:[['chana',100,'dry, soaked and boiled very soft'],['sesame',40,'toasted, ground into tahini'],['olive',15,'1 tbsp'],['lemon',30,'2 tbsp juice'],['garlic',5,'2 cloves'],['cumin',1,'1/2 tsp'],['water',60,'ice cold'],['salt',2,'to taste'],['cucumber',200,'sticks'],['carrot',200,'sticks']],
+st:['Grind the toasted sesame into a paste with a little olive oil.','Blend chickpeas, sesame paste, lemon, garlic, cumin and salt.','Stream in the cold water while blending until very smooth.','Drizzle with the remaining olive oil and serve with cucumber and carrot sticks.'],tip:'One serving is about 3 tbsp hummus with half the veggie sticks per person.'},
+{n:'Masoor lentil soup',cu:'Foreign',cat:'Soup',t:30,sv:2,ing:[['masoor',80,'washed'],['carrot',60,'diced'],['onion',50,'chopped'],['tomato',80,'chopped'],['garlic',5,'2 cloves'],['oil',6,'about 1 tsp'],['cumin',1,'1/2 tsp'],['lemon',10,'2 tsp juice'],['pepper',0.5,''],['water',700,''],['salt',3,'to taste']],
+st:['Heat oil and cook onion, garlic and carrot for 4 minutes.','Add cumin, tomato, lentils and water. Simmer 20 minutes until soft.','Blend half the soup for a creamy texture and stir back.','Season with salt, pepper and lemon.'],tip:'A bowl gives solid protein for very little fat.'},
+{n:'Instant ragi dosa',cu:'Indian',cat:'Breakfast',t:20,sv:2,ing:[['ragi',100,''],['curd',60,''],['onion',30,'finely chopped'],['coriander',5,'chopped'],['chilli',2,'chopped'],['cumin',1,'1/2 tsp'],['oil',8,'for the tawa'],['water',220,''],['salt',2,'to taste']],
+st:['Mix ragi, curd, salt and water into a thin, pourable batter. Rest 10 minutes.','Stir in onion, coriander, chilli and cumin.','Pour a ladle onto a hot tawa from a height, filling the gaps, like rava dosa.','Drizzle oil and cook on medium 3 minutes until crisp. Fold and serve.'],tip:'Ragi is rich in calcium. Eat with 2 eggs or sambar for protein.'},
+{n:'Peanut banana smoothie',cu:'Foreign',cat:'Drink',t:5,sv:1,ing:[['milk',250,'cold cow milk'],['banana',100,'1 medium'],['pbutter',16,'1 tbsp'],['oats',20,''],['cinnamon',0.5,'a pinch']],
+st:['Blend everything for 45 seconds until smooth.','Add a few ice cubes if you like it colder.'],tip:'A good post-gym drink when a meal is more than 2 hours away.'},
+{n:'Masala chaas',cu:'Gujarati',cat:'Drink',t:5,sv:1,ing:[['curd',80,''],['water',170,'cold'],['cumin',1,'roasted, powdered'],['mint',3,'a few leaves'],['coriander',3,''],['salt',1,'black salt']],
+st:['Blend curd, water, mint and coriander for 20 seconds.','Stir in roasted cumin and black salt.'],tip:'Have it with lunch. It helps digestion and fills you up.'},
+{n:'Egg fried rice',cu:'Asian',cat:'Main',t:20,sv:1,ing:[['rice',60,'cooked a day ahead and chilled'],['egg',100,'2 large eggs'],['carrot',40,'diced small'],['beans',40,'chopped'],['peas',30,''],['onion',30,'chopped'],['garlic',5,'chopped'],['soy',10,'2 tsp'],['oil',8,'about 2 tsp'],['pepper',0.5,''],['salt',0.5,'a pinch']],
+st:['Cook the rice and chill it, ideally overnight, so the grains stay separate.','Heat half the oil on high, scramble the eggs and set aside.','Add the rest of the oil, garlic and onion, then vegetables. Stir-fry 3 minutes.','Add rice, soy sauce and pepper and toss 2 minutes. Fold in the eggs.'],tip:'Use a wide pan on high heat. A crowded pan turns fried rice soggy.'},
+{n:'Rajma burrito bowl',cu:'Mexican',cat:'Main',t:20,sv:1,ing:[['brownrice',50,'dry, cooked'],['rajma',40,'dry, cooked'],['corn',40,'boiled'],['tomato',60,'diced for salsa'],['onion',30,'diced'],['lettuce',40,'shredded'],['avocado',40,'sliced'],['hungcurd',40,'instead of sour cream'],['lemon',10,'2 tsp juice'],['cumin',1,'1/2 tsp'],['chillip',0.5,'a pinch'],['coriander',5,'chopped'],['salt',1,'to taste']],
+st:['Warm the cooked rajma with cumin, chilli powder and salt, mashing a little.','Mix tomato, onion, coriander and lemon for a quick salsa.','Layer rice, lettuce, rajma, corn and salsa in a bowl.','Top with avocado and hung curd.'],tip:'Use leftover rajma and rice from dinner.'},
+{n:'Date and nut energy balls',cu:'Foreign',cat:'Sweet',t:15,sv:4,ing:[['dates',100,'pitted, about 8 to 10'],['almond',30,''],['walnut',20,''],['oats',20,'lightly roasted'],['coconut',10,'grated'],['cinnamon',1,'1/2 tsp']],
+st:['Pulse almonds, walnuts and oats into a coarse powder.','Add dates and cinnamon and pulse into a sticky dough.','Roll into 8 balls and coat with coconut.','Refrigerate 30 minutes to firm up.'],tip:'Two balls is one serving. A better sweet than mithai, but still calorie dense.'},
+{n:'Dalia kheer, low sugar',cu:'Indian',cat:'Sweet',t:30,sv:2,ing:[['milk',400,'cow milk'],['dalia',40,'roasted in 1/2 tsp ghee'],['ghee',2,'1/2 tsp'],['jaggery',20,'or 4 chopped dates'],['almond',10,'sliced'],['cinnamon',0.3,'or cardamom']],
+st:['Roast dalia in ghee for 3 minutes.','Add milk and simmer on low for 20 minutes, stirring often, until soft and creamy.','Turn off the heat, wait 2 minutes, then stir in jaggery so the milk does not split.','Top with almonds and cardamom.'],tip:'Better than a mithai craving, but keep it to once or twice a week.'},
+{n:'Mint coriander chutney',cu:'Indian',cat:'Side',t:5,sv:4,ing:[['mint',30,'leaves'],['coriander',30,'with stems'],['chilli',5,'2 small'],['garlic',3,'1 clove'],['lemon',15,'1 tbsp juice'],['hungcurd',40,'for a creamy version'],['cumin',1,'roasted'],['salt',2,'to taste']],
+st:['Blend mint, coriander, chilli, garlic, lemon, cumin and salt with 2 tbsp cold water.','Stir in hung curd.'],tip:'About 2 tbsp per serving. Lifts any tikka, chilla or salad for almost no calories.'},
+{n:'Methi besan pudla',cu:'Gujarati',cat:'Breakfast',t:15,sv:1,ing:[['besan',50,''],['methi',30,'chopped'],['curd',30,''],['water',40,''],['ginger',3,'grated'],['chilli',2,'chopped'],['turmeric',0.5,'a pinch'],['sesame',3,'1 tsp'],['oil',5,'1 tsp'],['salt',1,'to taste']],
+st:['Mix besan, curd, water, methi, ginger, chilli, turmeric, sesame and salt into a thick pouring batter.','Spread on a hot non-stick tawa in two rounds.','Drizzle oil around the edges and cook 2 minutes on each side until crisp.'],tip:'All the flavour of methi thepla without the roti. Serve with curd.'},
+{n:'Lobia (chora) curry',cu:'Gujarati',cat:'Main',t:40,sv:2,ing:[['lobia',80,'soaked 6 hours'],['onion',60,'chopped'],['tomato',120,'chopped'],['garlic',6,'3 cloves'],['ginger',4,'grated'],['oil',10,'2 tsp'],['cumin',1,'1/2 tsp'],['turmeric',1,'1/4 tsp'],['chillip',1,'1/4 tsp'],['corianderp',2,'1 tsp'],['jaggery',3,'optional'],['lemon',10,'2 tsp juice'],['coriander',10,'chopped'],['water',450,''],['salt',3,'to taste']],
+st:['Pressure cook soaked lobia with 450 ml water and salt for 3 whistles.','Heat oil, add cumin, onion, ginger and garlic. Cook 5 minutes.','Add tomato and powders. Cook 5 minutes.','Add lobia with water and jaggery, simmer 8 minutes.','Finish with lemon and coriander.'],tip:'Chora is a Gujarati staple with as much protein as rajma and cooks faster.'},
+{n:'Dalia moong khichdi',cu:'Gujarati',cat:'Main',t:30,sv:2,ing:[['dalia',50,'or broken jowar'],['moongdal',50,''],['onion',40,'chopped'],['tomato',60,'chopped'],['peas',40,''],['carrot',40,'diced'],['ghee',8,'about 2 tsp'],['cumin',2,'1 tsp'],['turmeric',1,'1/4 tsp'],['ginger',4,'grated'],['water',600,''],['salt',3,'to taste']],
+st:['Wash dalia and dal together and drain.','Heat ghee in a cooker, add cumin, ginger and onion. Cook 3 minutes.','Add tomato, vegetables, turmeric, dalia, dal, salt and water.','Pressure cook 4 whistles and let it rest.'],tip:'More fibre than rice khichdi, so it keeps you full longer.'}
+];
+
+/* ---------- foods: [name, serving, kcal, P, C, F, fibre] or [name, serving, [[ingredient, grams], ...]] ---------- */
+var G=[
+{id:'pr',name:'Protein foods',role:'Builds and protects muscle and keeps you full. Target 130 g protein a day. Skim some malai before setting curd or making paneer to cut calories.',items:[
+['Whole egg, boiled','1 large, 50 g',78,6.3,0.6,5.3,0],
+['Egg white','1 large, 33 g',[['eggwhite',33]]],
+['Plain omelette','2 eggs with 1 tsp oil',[['egg',100],['oil',5]]],
+['Paneer from home milk','100 g',[['paneer',100]]],
+['Paneer from home milk','50 g',[['paneer',50]]],
+['Hung curd','200 g',[['hungcurd',200]]],
+['Curd (dahi)','1 katori, 100 g',[['curd',100]]],
+['Chaas','1 glass, 250 ml (80 g curd)',[['curd',80]]],
+['Cow milk from home','1 glass, 250 ml',[['milk',258]]],
+['Firm tofu','100 g',[['tofu',100]]],
+['Soya chunks, dry','30 g before cooking',[['soya',30]]],
+['Sattu powder','30 g',[['sattu',30]]]
+]},
+{id:'dl',name:'Dals and legumes',role:'Protein, slow carbs and fibre together. Cooked weights unless marked dry.',items:[
+['Dal, tadka (tuver)','1 katori, 150 g thin dal',[['toor',25],['ghee',3],['tomato',20],['turmeric',0.3],['cumin',0.5]]],
+['Moong whole, boiled','100 g',105,7,19.2,0.4,7.6],
+['Sprouted moong','100 g',[['sprmoong',100]]],
+['Kala chana or chole, boiled','100 g',164,8.9,27.4,2.6,7.6],
+['Rajma, boiled','100 g',127,8.7,22.8,0.5,6.4],
+['Chora (lobia), boiled','100 g',116,7.7,20.8,0.5,6.5],
+['Masoor dal, boiled','100 g',116,9,20.1,0.4,7.9],
+['Tuver dal, boiled','100 g',121,6.8,23.3,0.4,6.7],
+['Green peas, boiled','100 g',84,5.4,15.6,0.2,5.5],
+['Soybeans, boiled','100 g',173,16.6,9.9,9,6],
+['Roasted chana dal','30 g',[['roastchana',30]]],
+['Moong dal, dry','30 g',[['moongdal',30]]],
+['Rajma, dry','30 g',[['rajma',30]]]
+]},
+{id:'gr',name:'Carbs and grains',role:'Fuel for training. Keep to about one cup cooked per meal.',items:[
+['White rice, cooked','1 cup, 150 g',195,4.1,42.3,0.5,0.6],
+['Brown rice, cooked','1 cup, 150 g',185,4.1,38.4,1.5,2.4],
+['Rolled oats, dry','40 g',[['oats',40]]],
+['Dalia, cooked','150 g',125,4.7,28,0.3,6.8],
+['Quinoa, cooked','1/2 cup, 95 g',114,4.2,20.2,1.8,2.7],
+['Millet, cooked (bajra, jowar, ragi)','150 g',179,5.3,35.6,1.5,2],
+['Idli','1 piece, about 40 g',[['rice',12.5],['urad',3.75]]],
+['Poha, dry','40 g',[['poha',40]]],
+['Ragi flour','30 g',[['ragi',30]]],
+['Sweet potato, baked','100 g',90,2,20.7,0.2,3.3],
+['Potato, boiled','100 g',87,1.9,20.1,0.1,1.8],
+['Sweet corn, boiled','100 g',96,3.4,21,1.5,2.4],
+['Puffed rice (murmura)','20 g',[['murmura',20]]],
+['Whole wheat bread','1 slice, 30 g',[['bread',30]]]
+]},
+{id:'vg',name:'Vegetables',role:'Vitamins, minerals and fibre for very few calories. Aim for 400 to 500 g a day. Values are raw weight without oil.',items:[
+['Palak (spinach)','100 g',[['spinach',100]]],
+['Methi leaves','100 g',[['methi',100]]],
+['Bhindi (okra)','100 g',[['bhindi',100]]],
+['Doodhi (bottle gourd)','100 g',[['doodhi',100]]],
+['Ringan (brinjal)','100 g',[['brinjal',100]]],
+['Cabbage','100 g',[['cabbage',100]]],
+['Cauliflower','100 g',[['cauli',100]]],
+['Broccoli','100 g',[['broccoli',100]]],
+['French beans (fansi)','100 g',[['beans',100]]],
+['Green peas','100 g',[['peas',100]]],
+['Capsicum (green)','100 g',[['capsicum',100]]],
+['Bell pepper (red or yellow)','100 g',[['bellpep',100]]],
+['Carrot','100 g',[['carrot',100]]],
+['Beetroot','100 g',[['beet',100]]],
+['Button mushrooms','100 g',[['mushroom',100]]],
+['Zucchini','100 g',[['zucchini',100]]],
+['Pumpkin (kaddu)','100 g',[['pumpkin',100]]],
+['Karela (bitter gourd)','100 g',[['karela',100]]],
+['Tomato','100 g',[['tomato',100]]],
+['Cucumber','100 g',[['cucumber',100]]],
+['Onion','1 medium, 100 g',[['onion',100]]],
+['Lettuce','50 g',[['lettuce',50]]],
+['Sweet corn kernels, raw','50 g',[['corn',50]]]
+]},
+{id:'fr',name:'Fruit',role:'Vitamin C, potassium and fibre. One to two servings a day, whole fruit over juice. Edible weight.',items:[
+['Banana','1 medium, 100 g',[['banana',100]]],
+['Apple','1 medium, 150 g',[['apple',150]]],
+['Papaya','150 g',[['papaya',150]]],
+['Guava','1 medium, 100 g',[['guava',100]]],
+['Orange','1 medium, 130 g',[['orange',130]]],
+['Pomegranate seeds','100 g',[['pomegranate',100]]],
+['Amla','2 pieces, 50 g',[['amla',50]]],
+['Watermelon','200 g',[['watermelon',200]]],
+['Mango','150 g',[['mango',150]]],
+['Muskmelon','150 g',[['muskmelon',150]]],
+['Pineapple','100 g',[['pineapple',100]]],
+['Grapes','100 g',[['grapes',100]]],
+['Pear','1 medium, 150 g',[['pear',150]]],
+['Chikoo','1 medium, 80 g',[['chikoo',80]]],
+['Kiwi','1 piece, 75 g',[['kiwi',75]]],
+['Strawberries','100 g',[['strawberry',100]]],
+['Blueberries','50 g',[['blueberry',50]]],
+['Dates','2 pieces, 20 g',[['dates',20]]],
+['Raisins','15 g',[['raisins',15]]]
+]},
+{id:'nf',name:'Nuts, seeds and fats',role:'Fat runs your hormones and absorbs vitamins A, D, E and K. Measure these, they add up fast. Target 55 to 60 g fat a day.',items:[
+['Almonds','10 pieces, 12 g',[['almond',12]]],
+['Walnuts','4 halves, 15 g',[['walnut',15]]],
+['Cashews','6 pieces, 9 g',[['cashew',9]]],
+['Peanuts','20 g',[['peanut',20]]],
+['Peanut butter, unsweetened','1 tbsp, 16 g',[['pbutter',16]]],
+['Pumpkin seeds','15 g',[['pumpkinseed',15]]],
+['Sunflower seeds','15 g',[['sunflower',15]]],
+['Chia seeds','1 tbsp, 12 g',[['chia',12]]],
+['Flax seeds','1 tbsp, 10 g',[['flax',10]]],
+['Sesame seeds (til)','1 tbsp, 9 g',[['sesame',9]]],
+['Makhana','30 g',[['makhana',30]]],
+['Fresh coconut, grated','30 g',[['coconut',30]]],
+['Avocado','1/2 fruit, 70 g',[['avocado',70]]],
+['Ghee','1 tsp, 5 g',[['ghee',5]]],
+['Cooking oil','1 tsp, 5 g',[['oil',5]]],
+['Olive oil','1 tsp, 5 g',[['olive',5]]],
+['White butter','1 tsp, 5 g',[['butter',5]]]
+]},
+{id:'gj',name:'Gujarati extras',role:'Quick estimates for dishes without a recipe here. Most Gujarati staples have exact recipes in the Recipes tab.',items:[
+['Dhokla, white (idada)','2 pieces, 80 g',110,4,19,2,1.5],
+['Sev tameta','1 katori, 120 g',170,4,14,11,2],
+['Khakhra, plain','1 piece, 20 g',80,2.5,12,2.5,2],
+['Undhiyu (special day)','1 katori, 150 g',250,5,22,16,7]
+]},
+{id:'tr',name:'Drinks and treats',role:'Keep treats to one or two a week. Black coffee, lemon water and coconut water are the easy swaps for sugary drinks.',items:[
+['Black coffee or tea, no sugar','1 cup, 150 ml',5,0.3,0.6,0,0],
+['Lemon water, no sugar','1 glass, 250 ml',[['lemon',15]]],
+['Coconut water','1 glass, 250 ml',48,1.8,9.3,0.5,2.8],
+['Chai with milk and sugar','1 cup, 120 ml (60 ml milk, 1 tsp sugar)',[['milk',60],['sugar',5]]],
+['Jaggery','10 g',[['jaggery',10]]],
+['Honey','1 tsp, 7 g',[['honey',7]]],
+['Sugar','1 tsp, 5 g',[['sugar',5]]],
+['Fried farsan (gathiya, chevdo)','30 g',165,4.5,14,10,1.5],
+['Fafda','30 g',160,4,15,9.5,1.5],
+['Mithai (barfi, peda)','1 piece, 30 g',130,2.5,19,5,0],
+['Samosa','1 piece, 80 g',260,4,28,15,2],
+['Soft drink','1 glass, 250 ml',105,0,26,0,0],
+['Packaged fruit juice','1 glass, 200 ml',90,0.5,22,0,0]
+]}
+];
+
+/* recipe ids, categories and per-serving values */
+RECIPES.forEach(function(r,i){
+  r.id='r'+i;
+  r.tot=calc(r.ing,1);
+  r.per=calc(r.ing,r.sv);
+  r.wt=r.ing.reduce(function(s,x){return s+x[1];},0);
+});
+G.push({id:'rc',name:'Recipes, per serving',role:'Every recipe from the Recipes tab, with nutrition worked out from its ingredient weights. Tap the name to open the recipe.',items:RECIPES.map(function(r){
+  return [r.n,'1 serving, 1 of '+r.sv,[r.per.k,r.per.p,r.per.c,r.per.f,r.per.fb],r.id];
+})});
+
+var FOOD={};
+G.forEach(function(g){g.items.forEach(function(it,i){
+  var id=g.id+i,v;
+  if(Array.isArray(it[2])&&typeof it[2][0]==='number'){v={k:it[2][0],p:it[2][1],c:it[2][2],f:it[2][3],fb:it[2][4]};}
+  else if(Array.isArray(it[2])){v=calc(it[2],1);}
+  else{v={k:it[2],p:it[3],c:it[4],f:it[5],fb:it[6]};}
+  FOOD[id]={id:id,g:g.id,gn:g.name,n:it[0],s:it[1],k:v.k,p:v.p,c:v.c,f:v.f,fb:v.fb,rid:g.id==='rc'?it[3]:null};
+});});
+
+
+var MEALS=[['b','Breakfast'],['l','Lunch'],['s','Snack'],['d','Dinner']];
+var DEFAULT_T={k:2000,p:130,c:215,f:58,fb:32,w:14};
+
+/* ---------- helpers ---------- */
+function $(s){return document.querySelector(s);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function pad(n){return String(n).padStart(2,'0');}
+function ds(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function parse(s){var a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2]);}
+function shift(s,n){var d=parse(s);d.setDate(d.getDate()+n);return ds(d);}
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function r1(n){return Math.round(n*10)/10;}
+function r0(n){return Math.round(n);}
+var TODAY=ds(new Date());
+function autoMeal(){var h=new Date().getHours()+new Date().getMinutes()/60;return h<10.5?'b':h<15.5?'l':h<18.5?'s':'d';}
+function fmtDate(s){return parse(s).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});}
+
+/* ---------- state ---------- */
+var state={rq:'',rcat:'all',rcu:'all',rhp:false,rlow:false,rsort:'az',ropen:{},rscale:{},tab:'foods',group:'all',q:'',sort:'az',meal:autoMeal(),date:TODAY,days:{},body:{},targets:clone(DEFAULT_T)};
+
+function curDay(){return state.days[state.date]||{entries:[],water:0};}
+function totals(day){
+  var t={k:0,p:0,c:0,f:0,fb:0};
+  (day.entries||[]).forEach(function(e){t.k+=e.k*e.q;t.p+=e.p*e.q;t.c+=e.c*e.q;t.f+=e.f*e.q;t.fb+=e.fb*e.q;});
+  return t;
+}
+
+/* ---------- storage: shared db when granted, this device otherwise ---------- */
+var store={db:null,mode:'local',unsubs:[],
+  init:function(){
+    var self=this;
+    return Promise.resolve().then(function(){
+      if(window.claude&&window.claude.use){return window.claude.use('db');}
+      return null;
+    }).then(function(d){self.db=d||null;}).catch(function(){self.db=null;});
+  },
+  local:function(coll,cb){
+    var m={};try{m=JSON.parse(localStorage.getItem('tt:'+coll)||'{}');}catch(e){}
+    this.mode='local';cb(m);return function(){};
+  },
+  sub:function(coll,cb){
+    var self=this;
+    if(this.db){
+      try{
+        this.mode='db';
+        return this.db.collection(coll).onSnapshot(function(s){
+          var m={};s.docs.forEach(function(d){m[d.id]=d.data();});cb(m);
+        },function(){self.local(coll,cb);setStatus();});
+      }catch(e){}
+    }
+    return this.local(coll,cb);
+  },
+  put:function(coll,id,data){
+    var self=this;
+    var local=function(){
+      try{var m=JSON.parse(localStorage.getItem('tt:'+coll)||'{}');m[id]=data;localStorage.setItem('tt:'+coll,JSON.stringify(m));}catch(e){}
+    };
+    if(this.db&&this.mode==='db'){
+      return this.db.doc(coll+'/'+id).set(data).catch(function(){self.mode='local';local();setStatus();toast('Could not reach the shared store, saved on this device');});
+    }
+    local();return Promise.resolve();
+  }
+};
+function setStatus(){
+  $('#status').textContent='Saved on this phone';
+}
+
+function saveDay(day){state.days[state.date]=day;refresh();store.put('days',state.date,day);}
+function saveBody(date,rec){state.body[date]=rec;refresh();store.put('body',date,rec);}
+function saveTargets(t){state.targets=t;refresh();store.put('settings','targets',t);}
+
+/* ---------- actions ---------- */
+function addFood(id){
+  var f=FOOD[id];if(!f)return;
+  var day=clone(curDay());day.entries=day.entries||[];
+  var hit=null;
+  day.entries.forEach(function(e){if(e.id===id&&e.m===state.meal){hit=e;}});
+  if(hit){hit.q=r1(hit.q+1);}
+  else{day.entries.push({id:id,n:f.n,s:f.s,m:state.meal,q:1,k:f.k,p:f.p,c:f.c,f:f.f,fb:f.fb});}
+  saveDay(day);
+  var mn=MEALS.filter(function(m){return m[0]===state.meal;})[0][1];
+  toast('Added '+f.n+' to '+mn.toLowerCase());
+}
+function changeQty(i,delta){
+  var day=clone(curDay());var e=day.entries[i];if(!e)return;
+  e.q=r1(e.q+delta);
+  if(e.q<=0){day.entries.splice(i,1);}
+  saveDay(day);
+}
+function removeEntry(i){var day=clone(curDay());day.entries.splice(i,1);saveDay(day);}
+function changeWater(d){var day=clone(curDay());day.entries=day.entries||[];day.water=Math.max(0,(day.water||0)+d);saveDay(day);}
+
+var toastTimer;
+function toast(msg){var t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('on');},1800);}
+
+/* ---------- meters ---------- */
+var METERS=[['k','Calories','kcal','var(--accent)'],['p','Protein','g','var(--p)'],['c','Carbs','g','var(--c)'],['f','Fat','g','var(--f)'],['fb','Fibre','g','var(--fb)']];
+function meterHTML(key,label,unit,col,val,target,big){
+  var pct=Math.min(100,target?val/target*100:0);
+  var over=(key==='k'||key==='f')&&val>target*1.05;
+  var v=key==='k'?r0(val):r1(val);
+  var left=target-val;
+  var note='';
+  if(big){
+    if(key==='p'||key==='fb'){note=left>0?r0(left)+' '+unit+' to go':'Target reached';}
+    else{note=left>=0?r0(left)+' '+unit+' left':r0(-left)+' '+unit+' over';}
+  }
+  return '<div class="m'+(over?' over':'')+'" style="--col:'+col+'"><div class="m-top"><span class="m-l">'+label+'</span><span class="m-v">'+v+'<small>/'+target+(big?' '+unit:'')+'</small></span></div><div class="track" role="progressbar" aria-label="'+label+'" aria-valuemin="0" aria-valuemax="'+target+'" aria-valuenow="'+r0(val)+'"><i style="width:'+pct+'%"></i></div>'+(big?'<div class="left">'+note+'</div>':'')+'</div>';
+}
+function renderMini(){
+  var t=totals(curDay());var T=state.targets;
+  $('#mini').innerHTML=METERS.map(function(m){return meterHTML(m[0],m[1].replace('Calories','kcal'),m[2],m[3],t[m[0]],T[m[0]],false);}).join('');
+}
+
+/* ---------- foods tab ---------- */
+function viewFoods(){
+  var groups='<button class="chip" data-act="group" data-v="all" aria-pressed="'+(state.group==='all')+'">All</button>'+
+    G.map(function(g){return '<button class="chip" data-act="group" data-v="'+g.id+'" aria-pressed="'+(state.group===g.id)+'">'+esc(g.name)+'</button>';}).join('');
+  var meals=MEALS.map(function(m){return '<button class="chip" data-act="meal" data-v="'+m[0]+'" aria-pressed="'+(state.meal===m[0])+'">'+m[1]+'</button>';}).join('');
+  $('#view').innerHTML=
+    '<div class="ctl">'+
+      '<div class="row"><span class="lab">Adding to</span><div class="seg" id="mealSeg">'+meals+'</div></div>'+
+      '<div class="row"><input type="search" id="q" placeholder="Search paneer, dhokla, rajma" aria-label="Search foods" value="'+esc(state.q)+'">'+
+      '<select id="sort" aria-label="Sort foods"><option value="az">Sort: A to Z</option><option value="prot">Most protein first</option><option value="kcal">Fewest calories first</option></select></div>'+
+      '<div class="seg" id="grpSeg">'+groups+'</div>'+
+    '</div><div id="foodList"></div>'+
+    '<p class="note">Values are approximate and use cooked weights for dals, rice and vegetables. Dishes are typical home portions, so change the quantity in the Today tab if yours was bigger or smaller.</p>';
+  $('#sort').value=state.sort;
+  fillFoods();
+}
+function fillFoods(){
+  var q=state.q.trim().toLowerCase();var html='';
+  G.forEach(function(g){
+    if(state.group!=='all'&&state.group!==g.id)return;
+    var items=g.items.map(function(_,i){return FOOD[g.id+i];}).filter(function(f){return !q||(f.n+' '+f.s+' '+g.name).toLowerCase().indexOf(q)>-1;});
+    if(!items.length)return;
+    if(state.sort==='prot')items.sort(function(a,b){return b.p-a.p;});
+    else if(state.sort==='kcal')items.sort(function(a,b){return a.k-b.k;});
+    else items.sort(function(a,b){return a.n.localeCompare(b.n);});
+    html+='<section class="grp"><header><h2>'+esc(g.name)+'</h2><p>'+esc(g.role)+'</p></header>'+
+      items.map(function(f){
+        return '<div class="food"><div><div class="fn">'+esc(f.n)+'</div><div class="fs">'+esc(f.s)+(f.rid?' &middot; <button class="link" data-act="openrecipe" data-v="'+f.rid+'">See recipe</button>':'')+'</div></div>'+
+          '<div class="fm"><span class="k">'+r0(f.k)+' kcal</span><span class="p">P '+r1(f.p)+'</span><span class="c">C '+r1(f.c)+'</span><span class="f">F '+r1(f.f)+'</span><span class="fb">Fibre '+r1(f.fb)+'</span></div>'+
+          '<button class="add" data-act="add" data-v="'+f.id+'" aria-label="Add '+esc(f.n)+'">+</button></div>';
+      }).join('')+'</section>';
+  });
+  $('#foodList').innerHTML=html||'<p class="empty">Nothing matches that search. Try a shorter word like "dal" or "paneer".</p>';
+}
+
+/* ---------- today tab ---------- */
+function viewToday(){
+  $('#view').innerHTML=
+    '<div class="stack">'+
+    '<div class="datenav"><button class="ib" data-act="day" data-v="-1" aria-label="Previous day">&#8249;</button><b id="dlabel"></b><button class="ib" data-act="day" data-v="1" aria-label="Next day">&#8250;</button></div>'+
+    '<div class="card bigm" id="bigm"></div>'+
+    '<div class="card water" id="water"></div>'+
+    '<div class="card" id="meals"></div>'+
+    '</div>';
+  fillToday();
+}
+function fillToday(){
+  var day=curDay();var t=totals(day);var T=state.targets;
+  $('#dlabel').textContent=(state.date===TODAY?'Today, ':'')+fmtDate(state.date);
+  $('#bigm').innerHTML=METERS.map(function(m){return meterHTML(m[0],m[1],m[2],m[3],t[m[0]],T[m[0]],true);}).join('');
+  var w=day.water||0;var gl='';
+  for(var i=0;i<Math.max(T.w,w);i++){gl+='<span class="gl'+(i<w?' on':'')+'"></span>';}
+  $('#water').innerHTML='<div><div class="m-l">Water</div><div class="m-v">'+(w*0.25).toFixed(2).replace(/0$/,'')+' L <small>of '+(T.w*0.25)+' L, glasses of 250 ml</small></div></div><div class="glasses" aria-hidden="true">'+gl+'</div>'+
+    '<div class="qty"><button data-act="water" data-v="-1" aria-label="Remove a glass">&minus;</button><b>'+w+'</b><button data-act="water" data-v="1" aria-label="Add a glass">+</button></div>';
+  var html='';
+  MEALS.forEach(function(m){
+    var rows=[];var kc=0,pr=0;
+    (day.entries||[]).forEach(function(e,i){if(e.m===m[0]){rows.push([e,i]);kc+=e.k*e.q;pr+=e.p*e.q;}});
+    html+='<div class="meal" style="margin-bottom:14px"><h3>'+m[1]+'<span>'+r0(kc)+' kcal &middot; '+r1(pr)+' g protein</span></h3>';
+    if(!rows.length){html+='<p class="empty">Nothing logged. <button class="link" data-act="goadd" data-v="'+m[0]+'">Add food</button></p>';}
+    rows.forEach(function(r){
+      var e=r[0],i=r[1];
+      html+='<div class="ent"><div><div class="fn">'+esc(e.n)+'</div><div class="fs">'+esc(e.s)+' &times; '+e.q+' &middot; '+r0(e.k*e.q)+' kcal, P '+r1(e.p*e.q)+' g</div></div>'+
+        '<div class="qty"><button data-act="qty" data-i="'+i+'" data-v="-0.5" aria-label="Less">&minus;</button><b>'+e.q+'</b><button data-act="qty" data-i="'+i+'" data-v="0.5" aria-label="More">+</button></div>'+
+        '<button class="rm" data-act="rm" data-i="'+i+'" aria-label="Remove '+esc(e.n)+'">&times;</button></div>';
+    });
+    html+='</div>';
+  });
+  $('#meals').innerHTML=html;
+}
+
+/* ---------- progress tab ---------- */
+function viewProgress(){
+  var T=state.targets;
+  $('#view').innerHTML=
+    '<div class="stack">'+
+    '<div class="card"><h2>Weight and waist</h2><p class="cap">Weigh 2 or 3 mornings a week, same time, before eating. Judge the weekly trend, not one reading.</p>'+
+      '<div class="form" style="margin-top:10px"><label>Date<input type="date" id="bd" value="'+TODAY+'"></label><label>Weight (kg)<input type="number" id="bk" step="0.1" min="30" max="250" inputmode="decimal" placeholder="84.0"></label><label>Waist (cm)<input type="number" id="bw" step="0.5" min="40" max="200" inputmode="decimal" placeholder="optional"></label><button class="btn" data-act="savebody">Save</button></div></div>'+
+    '<div class="card"><h2>Weight trend</h2><div class="svgwrap" id="wchart"></div><p class="cap" id="wcap"></p></div>'+
+    '<div class="card"><h2>Last 7 days</h2><div class="svgwrap" id="kchart"></div><p class="cap" id="kcap"></p></div>'+
+    '<div class="card"><h2>Back up your data</h2><p class="cap">Your log lives only on this phone. Save a backup file every week or two, and use Restore on a new phone or after clearing the browser.</p>'+'<div class="row" style="margin-top:10px"><button class="btn" data-act="export">Save backup file</button><label class="btn alt" for="importFile" style="cursor:pointer">Restore from file</label><input type="file" id="importFile" accept="application/json,.json" hidden></div></div>'+'<details class="card"><summary>Daily targets</summary><p class="cap">Set by a 500 kcal deficit at 84 kg. Change them if your trainer adjusts the plan.</p>'+
+      '<div class="form" style="margin-top:10px">'+
+      [['k','Calories'],['p','Protein g'],['c','Carbs g'],['f','Fat g'],['fb','Fibre g'],['w','Water glasses']].map(function(x){return '<label>'+x[1]+'<input type="number" id="t_'+x[0]+'" value="'+T[x[0]]+'" min="0" inputmode="numeric"></label>';}).join('')+
+      '<button class="btn alt" data-act="savetargets">Save targets</button></div></details>'+
+    '</div>';
+  fillProgress();
+}
+function weightChart(rows){
+  var W=320,H=180,L=34,R=12,T=14,B=24,goal=65,start=84;
+  var kgs=rows.map(function(r){return r.kg;});
+  var lo=Math.min.apply(null,[goal-1].concat(kgs)),hi=Math.max.apply(null,[start+1].concat(kgs));
+  var y=function(v){return T+(hi-v)/(hi-lo)*(H-T-B);};
+  var x=function(i){return rows.length<2?L+(W-L-R)/2:L+i*(W-L-R)/(rows.length-1);};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Weight over time with a goal of 65 kg">';
+  for(var v=Math.ceil(lo/5)*5;v<=hi;v+=5){s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-5)+'" y="'+(y(v)+3)+'" text-anchor="end">'+v+'</text>';}
+  s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(start)+'" y2="'+y(start)+'" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3"/><text x="'+(W-R)+'" y="'+(y(start)-4)+'" text-anchor="end">start 84</text>';
+  s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(goal)+'" y2="'+y(goal)+'" stroke="var(--p)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+(W-R)+'" y="'+(y(goal)-4)+'" text-anchor="end" style="fill:var(--p)">goal 65</text>';
+  if(rows.length>1){s+='<polyline fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" points="'+rows.map(function(r,i){return x(i)+','+y(r.kg);}).join(' ')+'"/>';}
+  rows.forEach(function(r,i){s+='<circle cx="'+x(i)+'" cy="'+y(r.kg)+'" r="3.5" fill="var(--accent)"/>';});
+  if(rows.length){var last=rows[rows.length-1];s+='<text class="ink" x="'+Math.min(x(rows.length-1),W-R-14)+'" y="'+(y(last.kg)-9)+'" text-anchor="middle">'+last.kg+'</text>';
+    s+='<text x="'+L+'" y="'+(H-6)+'">'+fmtDate(rows[0].d).replace(/^\w+, /,'')+'</text>';
+    if(rows.length>1)s+='<text x="'+(W-R)+'" y="'+(H-6)+'" text-anchor="end">'+fmtDate(last.d).replace(/^\w+, /,'')+'</text>';}
+  return s+'</svg>';
+}
+function weekChart(){
+  var T=state.targets;var W=320,H=170,L=6,R=6,Tp=16,B=40;
+  var days=[];for(var i=6;i>=0;i--)days.push(shift(TODAY,-i));
+  var tot=days.map(function(d){return totals(state.days[d]||{entries:[]});});
+  var mx=Math.max.apply(null,[T.k*1.25].concat(tot.map(function(t){return t.k;})));
+  var bw=(W-L-R)/7,ph=H-Tp-B;
+  var ty=H-B-(T.k/mx)*ph;
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Calories per day for the last 7 days against the target">';
+  days.forEach(function(d,i){
+    var h=(tot[i].k/mx)*ph;var bx=L+i*bw+bw*0.18,w=bw*0.64;
+    s+='<rect x="'+bx+'" y="'+(H-B-h)+'" width="'+w+'" height="'+Math.max(h,1)+'" rx="3" fill="var(--accent)" opacity="'+(tot[i].k?0.9:0.35)+'"/>';
+    if(tot[i].k)s+='<text class="ink" x="'+(bx+w/2)+'" y="'+(H-B-h-4)+'" text-anchor="middle">'+r0(tot[i].k)+'</text>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+13)+'" text-anchor="middle">'+parse(d).toLocaleDateString('en-IN',{weekday:'narrow'})+'</text>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+27)+'" text-anchor="middle" style="fill:'+(tot[i].p>=T.p?'var(--p)':'var(--muted)')+'">P'+r0(tot[i].p)+'</text>';
+  });
+  s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+ty+'" y2="'+ty+'" stroke="var(--ink)" stroke-width="1" stroke-dasharray="4 3"/><text x="'+L+'" y="'+(ty-4)+'">target '+T.k+'</text>';
+  return {svg:s+'</svg>',hit:tot.filter(function(t){return t.p>=T.p;}).length,logged:tot.filter(function(t){return t.k>0;}).length};
+}
+function fillProgress(){
+  var rows=Object.keys(state.body).sort().map(function(d){return {d:d,kg:Number(state.body[d].kg)};}).filter(function(r){return r.kg>0;});
+  $('#wchart').innerHTML=weightChart(rows);
+  var cap;
+  if(!rows.length){cap='No readings yet. Save your first weight above and the line starts here.';}
+  else{
+    var first=rows[0],last=rows[rows.length-1];
+    var lost=r1(first.kg-last.kg);
+    cap='Latest '+last.kg+' kg, '+r1(last.kg-65)+' kg above goal.'+(rows.length>1?' Change since first reading: '+(lost>=0?'down ':'up ')+Math.abs(lost)+' kg.':'');
+  }
+  var waists=Object.keys(state.body).sort().filter(function(d){return state.body[d].waist;});
+  if(waists.length)cap+=' Waist '+state.body[waists[waists.length-1]].waist+' cm.';
+  $('#wcap').textContent=cap;
+  var wk=weekChart();
+  $('#kchart').innerHTML=wk.svg;
+  $('#kcap').textContent=wk.logged?('Protein target hit on '+wk.hit+' of the last '+wk.logged+' logged days. Green P numbers show the days you reached it.'):'Log meals in the Foods tab and your week fills in here.';
+}
+
+/* ---------- guide tab ---------- */
+function viewGuide(){
+  var T=state.targets;
+  var nut=[
+    ['Carbohydrates',T.c+' g','var(--c)','4 kcal per gram. Fuel for lifting and for your brain.','Rice, oats, poha, millets, dals, fruit. Fibre is part of this group: aim for 30 to 35 g.'],
+    ['Protein',T.p+' g','var(--p)','4 kcal per gram. Keeps muscle while you lose fat, and keeps hunger down.','Eggs, paneer, curd, tofu, soya, dals, sprouts, sattu.'],
+    ['Fats',T.f+' g','var(--f)','9 kcal per gram. Hormones, and absorbing vitamins A, D, E and K.','Home ghee and butter in small amounts, nuts, seeds, walnuts and flax for omega-3.'],
+    ['Vitamins','Small amounts','var(--fb)','Run the body: energy, immunity, bones, blood. A, B group, C, D, E, K.','Colour variety in vegetables and fruit, milk, curd and eggs. Test B12 and D.'],
+    ['Minerals','Small amounts','var(--w)','Iron, calcium, zinc, magnesium, potassium. Blood, bones, muscles, nerves.','Palak, methi, chana, milk, curd, ragi, seeds, banana, coconut water.'],
+    ['Water',(T.w*0.25)+' L','var(--w)','No calories. Digestion, training and appetite control.','Plain water, chaas, lemon water, coconut water.']
+  ];
+  var groups=[['Vegetables','400 to 500 g','Include leafy greens daily'],['Fruit','150 to 200 g','1 to 2 servings'],['Dals, legumes, sprouts','80 to 100 g dry','Around 2 katoris cooked'],['Grains or millets','150 to 180 g cooked','About 1 to 1.5 cups'],['Milk, curd or paneer','400 to 500 ml milk equivalent','From your own cows'],['Eggs','2 to 4',''],['Nuts and seeds','20 to 30 g','A small handful'],['Oil and ghee, total','15 to 20 g','3 to 4 tsp including cooking'],['Water','3 to 4 litres','']];
+  var micro=[
+    ['Iron','about 19 mg','Palak, methi, bajra, chana, rajma, eggs','Squeeze lemon on it. Keep tea away from meals.'],
+    ['Calcium','about 1000 mg','Milk, curd, paneer, ragi, til','Your home dairy covers most of it.'],
+    ['Vitamin B12','about 2.2 mcg','Milk, curd, paneer, eggs','Often low in vegetarians. Get tested.'],
+    ['Vitamin D','about 600 IU','Morning sun, eggs, milk','Very common deficiency in India. Get tested.'],
+    ['Vitamin C','about 80 mg','Amla, guava, lemon, orange, capsicum','Raw is best, heat destroys some.'],
+    ['Vitamin A','about 1000 mcg','Carrot, palak, sweet potato, papaya, ghee, eggs','Needs a little fat to absorb.'],
+    ['Folate','about 300 mcg','Palak, methi, dals, chana, sprouts',''],
+    ['Magnesium','about 440 mg','Almonds, pumpkin seeds, oats, dals, banana',''],
+    ['Zinc','about 17 mg','Pumpkin seeds, dals, chana, paneer, curd',''],
+    ['Potassium','about 3500 mg','Banana, coconut water, sweet potato, dals, palak','Helps with cramps after gym.'],
+    ['Omega-3','1 to 2 g ALA','Walnuts, flax, chia','Or an algae-based supplement.'],
+    ['Salt','under 5 g','','Main sources are papad, pickle, farsan and packaged snacks.']
+  ];
+  var swaps=[
+    ['Sweet dal and kadhi','Halve the jaggery or sugar, then drop it over a few weeks.'],
+    ['Shaak swimming in oil','1 tsp oil per dish. Use a non-stick pan and a lid.'],
+    ['Ghee poured on top','1 tsp on khichdi is fine.'],
+    ['Chevdo or gathiya with chai','Roasted chana, makhana or sprouts instead.'],
+    ['Fried bhajiya and fafda','Steamed muthia, khaman, dhokla or air-fried versions.'],
+    ['Thick sweet chai, many times a day','2 cups, half the sugar, then none.'],
+    ['Second helping from habit','Serve once, eat to 80% full, wait 10 minutes.']
+  ];
+  $('#view').innerHTML=
+    '<div class="stack">'+
+    '<div><h2>The 6 nutrients, your daily amounts</h2><p class="cap">Based on about '+T.k+' kcal a day for fat loss at your size.</p></div>'+
+    '<div class="nut">'+nut.map(function(n){return '<div class="card" style="--col:'+n[2]+'"><h3>'+n[0]+'</h3><div class="big">'+n[1]+'</div><p>'+n[3]+'</p><p class="src">'+n[4]+'</p></div>';}).join('')+'</div>'+
+    '<div class="card"><h2>The plate rule</h2><p style="margin-top:6px">At lunch and dinner: half the plate shaak and salad, a quarter protein (dal, kathol, paneer, tofu, eggs, curd), a quarter carbs (rice, khichdi, millet).</p></div>'+
+    '<div class="card"><h2>Food groups per day</h2><div class="scroll"><table class="tbl"><thead><tr><th>Group</th><th>Amount</th><th>Note</th></tr></thead><tbody>'+groups.map(function(g){return '<tr><td>'+g[0]+'</td><td class="num">'+g[1]+'</td><td>'+g[2]+'</td></tr>';}).join('')+'</tbody></table></div></div>'+
+    '<div class="card"><h2>Vitamins and minerals</h2><p class="cap">Approximate adult male needs, following ICMR-NIN 2020 values. Variety does most of the work, but B12, vitamin D and iron are worth a blood test.</p><div class="scroll"><table class="tbl"><thead><tr><th>Nutrient</th><th>Per day</th><th>Best sources for you</th><th>Tip</th></tr></thead><tbody>'+micro.map(function(m){return '<tr><td>'+m[0]+'</td><td class="num">'+m[1]+'</td><td>'+m[2]+'</td><td>'+m[3]+'</td></tr>';}).join('')+'</tbody></table></div></div>'+
+    '<div class="card"><h2>Gujarati kitchen fixes</h2><div class="scroll"><table class="tbl"><thead><tr><th>Habit</th><th>Swap</th></tr></thead><tbody>'+swaps.map(function(s){return '<tr><td style="white-space:normal">'+s[0]+'</td><td>'+s[1]+'</td></tr>';}).join('')+'</tbody></table></div></div>'+
+    '</div><p class="note">This is general nutrition guidance, not medical advice. Numbers are approximate and vary by recipe and brand. Check with your trainer or a doctor if you have a medical condition.</p>';
+}
+
+/* ---------- recipes tab ---------- */
+var RID2FOOD={};Object.keys(FOOD).forEach(function(id){if(FOOD[id].rid)RID2FOOD[FOOD[id].rid]=id;});
+var RCATS=[['all','All'],['Breakfast','Breakfast'],['Main','Lunch and dinner'],['Snack','Snacks'],['Soup','Soups'],['Salad','Salads'],['Drink','Drinks'],['Sweet','Sweets'],['Side','Chutneys']];
+var RCUIS=[['all','All cuisines'],['Gujarati','Gujarati'],['Indian','Indian'],['Asian','Asian'],['Foreign','International']];
+function cuLabel(c){return c==='Foreign'?'International':c;}
+function fmtG(g){return g>=10?String(Math.round(g)):String(Math.round(g*10)/10);}
+function chips(list,act,cur,seg){return '<div class="seg" id="'+seg+'">'+list.map(function(x){return '<button class="chip" data-act="'+act+'" data-v="'+x[0]+'" aria-pressed="'+(cur===x[0])+'">'+x[1]+'</button>';}).join('')+'</div>';}
+function pressSeg(seg,v){var cs=document.querySelectorAll('#'+seg+' .chip');for(var k=0;k<cs.length;k++)cs[k].setAttribute('aria-pressed',String(cs[k].getAttribute('data-v')===v));}
+function viewRecipes(){
+  var meals=MEALS.map(function(m){return '<button class="chip" data-act="meal" data-v="'+m[0]+'" aria-pressed="'+(state.meal===m[0])+'">'+m[1]+'</button>';}).join('');
+  $('#view').innerHTML=
+    '<div class="ctl">'+
+      '<div class="row"><span class="lab">Log to</span><div class="seg" id="mealSeg">'+meals+'</div></div>'+
+      '<div class="row"><input type="search" id="rq" placeholder="Search a dish or ingredient, e.g. paneer, moong" aria-label="Search recipes" value="'+esc(state.rq)+'">'+
+      '<select id="rsort" aria-label="Sort recipes"><option value="az">Sort: A to Z</option><option value="prot">Most protein first</option><option value="ratio">Most protein per calorie</option><option value="kcal">Fewest calories first</option></select></div>'+
+      chips(RCATS,'rcat',state.rcat,'rcatSeg')+
+      '<div class="row">'+chips(RCUIS,'rcu',state.rcu,'rcuSeg')+
+      '<div class="seg"><button class="chip" data-act="rflag" data-v="hp" aria-pressed="'+state.rhp+'">20 g+ protein</button><button class="chip" data-act="rflag" data-v="low" aria-pressed="'+state.rlow+'">Under 300 kcal</button></div></div>'+
+    '</div><p class="cap" id="rcount"></p><div id="recList"></div>'+
+    '<p class="note">Nutrition per serving is calculated from the raw or dry weight of every ingredient (USDA FoodData Central and IFCT 2017 values), then divided by the number of servings. Weigh ingredients raw for the most accurate numbers. Real food varies by variety and brand, so expect about 5 to 10% difference.</p>';
+  $('#rsort').value=state.rsort;
+  fillRecipes();
+}
+function recipeCard(r){
+  var open=!!state.ropen[r.id],p=r.per;
+  var macros='<span class="k">'+r0(p.k)+' kcal</span><span class="p">P '+r1(p.p)+'</span><span class="c">C '+r1(p.c)+'</span><span class="f">F '+r1(p.f)+'</span><span class="fb">Fibre '+r1(p.fb)+'</span>';
+  var h='<article class="rcp" id="card_'+r.id+'"><button class="rhead" data-act="rtoggle" data-v="'+r.id+'" aria-expanded="'+open+'">'+
+    '<span class="rtitle"><span class="fn">'+esc(r.n)+'</span><span class="fs">'+cuLabel(r.cu)+' &middot; '+r.t+' min &middot; serves '+r.sv+' &middot; per serving</span></span>'+
+    '<span class="fm">'+macros+'</span><span class="chev" aria-hidden="true">'+(open?'&#9652;':'&#9662;')+'</span></button>';
+  if(open){
+    var sv=state.rscale[r.id]||r.sv,m=sv/r.sv;
+    var raw=0,wat=0;r.ing.forEach(function(x){if(x[0]==='water')wat+=x[1]*m;else raw+=x[1]*m;});
+    h+='<div class="rbody">'+
+      '<div class="row"><span class="lab">Cooking for</span><div class="qty"><button data-act="rserv" data-v="'+r.id+'" data-d="-1" aria-label="Fewer servings">&minus;</button><b>'+sv+'</b><button data-act="rserv" data-v="'+r.id+'" data-d="1" aria-label="More servings">+</button></div><span class="fs">'+(sv===1?'serving':'servings')+', '+Math.round(raw)+' g ingredients'+(wat?' plus '+Math.round(wat)+' ml water':'')+'</span></div>'+
+      '<div class="scroll"><table class="tbl ing"><thead><tr><th>Ingredient</th><th>Amount</th><th>Note</th></tr></thead><tbody>'+
+      r.ing.map(function(x){var d=DB[x[0]];return '<tr><td>'+esc(d[0])+'</td><td class="num">'+fmtG(x[1]*m)+(x[0]==='water'?' ml':' g')+'</td><td>'+esc(x[2]||'')+'</td></tr>';}).join('')+
+      '</tbody></table></div>'+
+      '<div><h3>Method</h3><ol class="steps">'+r.st.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ol></div>'+
+      (r.tip?'<p class="tipx">'+esc(r.tip)+'</p>':'')+
+      '<p class="fs">Whole batch of '+sv+': '+r0(r.per.k*sv)+' kcal, protein '+r1(r.per.p*sv)+' g, carbs '+r1(r.per.c*sv)+' g, fat '+r1(r.per.f*sv)+' g, fibre '+r1(r.per.fb*sv)+' g.</p>'+
+      '<div><button class="btn" data-act="add" data-v="'+RID2FOOD[r.id]+'">Log 1 serving</button></div>'+
+    '</div>';
+  }
+  return h+'</article>';
+}
+function fillRecipes(){
+  var q=state.rq.trim().toLowerCase();
+  var list=RECIPES.filter(function(r){
+    if(state.rcat!=='all'&&r.cat!==state.rcat)return false;
+    if(state.rcu!=='all'){if(state.rcu==='Foreign'){if(r.cu!=='Foreign'&&r.cu!=='Mexican')return false;}else if(r.cu!==state.rcu)return false;}
+    if(state.rhp&&r.per.p<20)return false;
+    if(state.rlow&&r.per.k>=300)return false;
+    if(q){var hay=(r.n+' '+r.cu+' '+r.ing.map(function(x){return DB[x[0]][0];}).join(' ')).toLowerCase();if(hay.indexOf(q)<0)return false;}
+    return true;
+  });
+  if(state.rsort==='prot')list.sort(function(a,b){return b.per.p-a.per.p;});
+  else if(state.rsort==='ratio')list.sort(function(a,b){return b.per.p/b.per.k-a.per.p/a.per.k;});
+  else if(state.rsort==='kcal')list.sort(function(a,b){return a.per.k-b.per.k;});
+  else list.sort(function(a,b){return a.n.localeCompare(b.n);});
+  $('#rcount').textContent=list.length+' of '+RECIPES.length+' recipes. Tap one to see ingredients in grams and the method.';
+  $('#recList').innerHTML=list.map(recipeCard).join('')||'<p class="empty">No recipe matches. Clear a filter or try a shorter word.</p>';
+}
+
+/* ---------- routing and refresh ---------- */
+function renderTabs(){
+  var btns=document.querySelectorAll('#tabs .tab');
+  for(var i=0;i<btns.length;i++){btns[i].setAttribute('aria-selected',String(btns[i].getAttribute('data-v')===state.tab));}
+}
+function show(tab){
+  state.tab=tab;renderTabs();
+  if(tab==='foods')viewFoods();else if(tab==='recipes')viewRecipes();else if(tab==='today')viewToday();else if(tab==='progress')viewProgress();else viewGuide();
+  window.scrollTo(0,0);
+}
+function refresh(){
+  renderMini();
+  if(state.tab==='today')fillToday();
+  else if(state.tab==='progress')fillProgress();
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',function(ev){
+  var el=ev.target.closest('[data-act]');if(!el)return;
+  var a=el.getAttribute('data-act'),v=el.getAttribute('data-v'),i=Number(el.getAttribute('data-i'));
+  if(a==='tab')show(v);
+  else if(a==='group'){state.group=v;var cs=document.querySelectorAll('#grpSeg .chip');for(var k=0;k<cs.length;k++)cs[k].setAttribute('aria-pressed',String(cs[k].getAttribute('data-v')===v));fillFoods();}
+  else if(a==='meal'){state.meal=v;var ms=document.querySelectorAll('#mealSeg .chip');for(var j=0;j<ms.length;j++)ms[j].setAttribute('aria-pressed',String(ms[j].getAttribute('data-v')===v));}
+  else if(a==='rtoggle'){state.ropen[v]=!state.ropen[v];fillRecipes();}
+  else if(a==='rserv'){var rr=RECIPES.filter(function(x){return x.id===v;})[0];var cur=state.rscale[v]||rr.sv;state.rscale[v]=Math.max(1,Math.min(20,cur+Number(el.getAttribute('data-d'))));fillRecipes();}
+  else if(a==='rcat'){state.rcat=v;pressSeg('rcatSeg',v);fillRecipes();}
+  else if(a==='rcu'){state.rcu=v;pressSeg('rcuSeg',v);fillRecipes();}
+  else if(a==='rflag'){if(v==='hp')state.rhp=!state.rhp;else state.rlow=!state.rlow;el.setAttribute('aria-pressed',String(v==='hp'?state.rhp:state.rlow));fillRecipes();}
+  else if(a==='openrecipe'){state.ropen[v]=true;state.rcat='all';state.rcu='all';state.rq='';state.rhp=false;state.rlow=false;show('recipes');var card=document.getElementById('card_'+v);if(card)card.scrollIntoView({block:'start'});}
+  else if(a==='export'){exportData();}
+  else if(a==='add')addFood(v);
+  else if(a==='qty')changeQty(i,Number(v));
+  else if(a==='rm')removeEntry(i);
+  else if(a==='water')changeWater(Number(v));
+  else if(a==='day'){state.date=shift(state.date,Number(v));if(state.date>TODAY)state.date=TODAY;refresh();}
+  else if(a==='goadd'){state.meal=v;show('foods');}
+  else if(a==='savebody'){
+    var d=$('#bd').value||TODAY,kg=parseFloat($('#bk').value),w=parseFloat($('#bw').value);
+    if(!(kg>0)){toast('Enter your weight in kg first');return;}
+    var rec={kg:r1(kg)};if(w>0)rec.waist=r1(w);
+    saveBody(d,rec);$('#bk').value='';$('#bw').value='';toast('Saved '+rec.kg+' kg');
+  }
+  else if(a==='savetargets'){
+    var t={};['k','p','c','f','fb','w'].forEach(function(key){var n=parseFloat($('#t_'+key).value);t[key]=n>0?n:DEFAULT_T[key];});
+    saveTargets(t);toast('Targets saved');
+  }
+});
+document.addEventListener('input',function(ev){
+  if(ev.target.id==='q'){state.q=ev.target.value;fillFoods();}
+  if(ev.target.id==='rq'){state.rq=ev.target.value;fillRecipes();}
+});
+function readLS(k){try{return JSON.parse(localStorage.getItem('tt:'+k)||'{}');}catch(e){return {};}}
+function exportData(){
+  var data={app:'thali-tracker',version:1,exported:new Date().toISOString(),days:readLS('days'),body:readLS('body'),settings:readLS('settings')};
+  var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='thali-backup-'+TODAY+'.json';
+  document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
+  toast('Backup saved to your downloads');
+}
+function importData(file){
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var d=JSON.parse(r.result);
+      if(d.app!=='thali-tracker'||typeof d.days!=='object')throw new Error('bad');
+      ['days','body','settings'].forEach(function(k){localStorage.setItem('tt:'+k,JSON.stringify(d[k]||{}));});
+      state.days=d.days||{};state.body=d.body||{};
+      if(d.settings&&d.settings.targets)state.targets=Object.assign({},DEFAULT_T,d.settings.targets);
+      show(state.tab);toast('Restored '+Object.keys(state.days).length+' days of logs');
+    }catch(e){toast('That file is not a Thali Tracker backup');}
+  };
+  r.readAsText(file);
+}
+document.addEventListener('change',function(ev){
+  if(ev.target.id==='importFile'&&ev.target.files&&ev.target.files[0]){importData(ev.target.files[0]);ev.target.value='';}
+  if(ev.target.id==='sort'){state.sort=ev.target.value;fillFoods();}
+  if(ev.target.id==='rsort'){state.rsort=ev.target.value;fillRecipes();}
+});
+
+/* ---------- boot ---------- */
+renderTabs();renderMini();viewFoods();setStatus();
+store.init().then(function(){
+  store.sub('days',function(m){state.days=m;refresh();});
+  store.sub('body',function(m){state.body=m;refresh();});
+  store.sub('settings',function(m){if(m.targets){state.targets=Object.assign({},DEFAULT_T,m.targets);}refresh();if(state.tab==='guide')viewGuide();});
+  setStatus();
+});
+})();
+</script>
+
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(function(){});}
+</script>
+</body>
+</html>
